@@ -37,14 +37,16 @@
     row.appendChild(btn);box.appendChild(row);
   });
   document.getElementById('dp-toggle').onclick=function(){var p=document.getElementById('demo-panel');p.classList.toggle('collapsed');document.getElementById('dp-caret').textContent=p.classList.contains('collapsed')?'▸':'▾';};
-  document.getElementById('dp-gh').onclick=function(){window.open('https://github.com/JunyuZhan','_blank');};
+  document.getElementById('dp-gh').onclick=function(){window.open('https://github.com/JunyuZhan/law-firm-demo','_blank');};
   document.getElementById('dp-reset').onclick=function(){
     if(!navigator.serviceWorker||!navigator.serviceWorker.controller){location.reload();return;}
     fetch('/api/demo/reset',{method:'POST'}).then(function(){location.reload();}).catch(function(){location.reload();});
   };
   if('serviceWorker' in navigator){
     var swRebooted = sessionStorage.getItem('sw_rebooted');
-    navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(function(){
+    navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(function(reg){
+      // 主动探测更新：避免浏览器长期缓存旧 SW 导致功能缺失（如滑块验证接口）。
+      if(reg && reg.update) { try { reg.update(); } catch(e){} }
       // 首次访问时 SW 尚未接管本页，先行请求 /api 会 404 导致白屏；
       // 待 SW 接管本页后自动刷新一次，保证所有 /api 请求被拦截。
       if(!navigator.serviceWorker.controller && !swRebooted){
