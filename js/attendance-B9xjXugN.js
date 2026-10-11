@@ -1,0 +1,1 @@
+import{c0 as t}from"./bootstrap-BKAhjMte.js";function a(n){return t.get("/admin/attendance",{params:n})}function c(n){return t.post("/admin/attendance/check-in",{})}function d(n){return t.post("/admin/attendance/check-out",{})}function i(){return t.get("/admin/attendance/today")}export{d as a,c,a as f,i as g};

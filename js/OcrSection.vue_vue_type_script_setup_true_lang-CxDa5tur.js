@@ -1,0 +1,1 @@
+import{cV as r}from"./bootstrap-BKAhjMte.js";import{T as t,G as o,bc as n,ac as a}from"../jse/index-index-BBo-se1k.js";const p=t({name:"OcrSection",__name:"OcrSection",setup(c){return(e,s)=>o(r)?a("",!0):n(e.$slots,"default",{key:0})}});export{p as _};

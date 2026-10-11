@@ -1,0 +1,1 @@
+import{c0 as t}from"./bootstrap-BKAhjMte.js";function n(e){return t.get("/hr/employee",{params:e})}function p(e){return t.get(`/hr/employee/${e}`)}function l(e){return t.post("/hr/employee",e)}function u(e,r){return t.put(`/hr/employee/${e}`,r)}function m(e){return t.delete(`/hr/employee/${e}`)}export{p as a,l as c,m as d,n as g,u};

@@ -1,0 +1,1 @@
+import{c0 as e}from"./bootstrap-BKAhjMte.js";function o(t){return e.get(`/matter/${t}/state-compensation`)}function r(t){return e.post(`/matter/${t.matterId}/state-compensation`,t)}function s(t,a){return e.put(`/matter/${a.matterId}/state-compensation/${t}`,a)}export{r as c,o as g,s as u};
