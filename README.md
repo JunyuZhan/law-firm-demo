@@ -124,12 +124,12 @@
 
 ## 📦 仓库与源码说明
 
-| 仓库 | 性质 | 说明 |
+| 仓库 / 地址 | 性质 | 说明 |
 |---|---|---|
-| [`JunyuZhan`](https://github.com/JunyuZhan) | 🔒 私有 | 完整商业源码（前端工程 ＋ Spring Boot 后端 ＋ 数据库脚本 ＋ 部署文档），**不对外公开**。 |
-| [`JunyuZhan/law-firm-demo`](https://github.com/JunyuZhan/law-firm-demo) | 🌐 公开 | 本演示站点源码（前端构建产物 ＋ 浏览器内 Mock 适配层 `sw.js`），即为你正在浏览的在线 Demo。 |
+| [lawfirm.zhanjunyu.com](https://lawfirm.zhanjunyu.com/) | 🌐 在线演示 | 本系统的「纯前端 ＋ 浏览器内 Mock 数据」版本，无需后端即可完整体验全部界面与交互。 |
+| [`JunyuZhan/law-firm-demo`](https://github.com/JunyuZhan/law-firm-demo) | 🌐 公开 | 本演示站点源码（前端构建产物 ＋ 浏览器内 Mock 适配层 `sw.js`），即你正在浏览的在线 Demo。 |
 
-> 本仓库（`law-firm-demo`）仅用于**产品展示与体验**，不含后端源码；如需获取完整商业源码，请通过文末方式联系开发者。
+> 本仓库（`law-firm-demo`）仅用于**产品展示与体验**，不含后端源码；如需获取**完整商业源码**（含 Spring Boot 后端、数据库脚本、部署文档），请通过文末方式联系开发者，源码以双方约定方式交付。
 
 ---
 
