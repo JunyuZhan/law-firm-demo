@@ -12,14 +12,21 @@
 #demo-panel button{flex:none;border:none;border-radius:6px;padding:4px 8px;background:#1677ff;color:#fff;cursor:pointer;font-size:12px}
 #demo-panel button.ghost{background:#f2f3f5;color:#1f2329}
 #demo-panel .dp-tip{color:#86909c;font-size:12px;line-height:1.6;margin:6px 0 10px}
+#demo-panel .dp-field{margin:2px 0 12px}
+#demo-panel .dp-label{display:block;color:#86909c;font-size:12px;margin-bottom:6px}
+#demo-panel .dp-select{width:100%;padding:7px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:13px;color:#1f2329;background:#fff;outline:none}
+#demo-panel .dp-select:focus{border-color:#1677ff}
 #demo-panel.collapsed .dp-body{display:none}
 </style>
 <div id="demo-panel" class="collapsed">
   <div class="dp-head" id="dp-toggle"><b>演示模式 · Mock</b><span id="dp-caret">▸</span></div>
   <div class="dp-body">
-    <div class="dp-tip">本站为开源演示，所有数据由浏览器内 Mock 提供，刷新或重置可恢复。演示账号（密码均为 <code>123456</code>）：</div>
-    <div id="dp-accounts"></div>
-    <div class="dp-row" style="margin-top:8px">
+    <div class="dp-tip">本站为开源演示，所有数据由浏览器内 Mock 提供，刷新或重置可恢复。</div>
+    <div class="dp-field">
+      <label class="dp-label">演示账号（密码 123456 已预填）</label>
+      <select id="dp-account" class="dp-select"></select>
+    </div>
+    <div class="dp-row" style="margin-top:4px">
       <button id="dp-reset" class="ghost">重置演示数据</button>
       <button id="dp-gh">项目仓库</button>
     </div>
@@ -28,14 +35,15 @@
 <script>
 (function(){
   var accounts=[{u:'admin',r:'超级管理员'},{u:'director',r:'主任'},{u:'lawyer1',r:'主办律师'},{u:'leader',r:'团队负责人'},{u:'finance',r:'财务'},{u:'staff',r:'行政'},{u:'trainee',r:'实习律师'}];
-  var box=document.getElementById('dp-accounts');
+  var sel=document.getElementById('dp-account');
   accounts.forEach(function(a){
-    var row=document.createElement('div');row.className='dp-row';
-    row.innerHTML='<span><code>'+a.u+'</code> <span style="color:#86909c">'+a.r+'</span></span>';
-    var btn=document.createElement('button');btn.textContent='复制';
-    btn.onclick=function(){var t=a.u+' / 123456';if(navigator.clipboard)navigator.clipboard.writeText(t);btn.textContent='已复制';setTimeout(function(){btn.textContent='复制';},1200);};
-    row.appendChild(btn);box.appendChild(row);
+    var o=document.createElement('option');o.value=a.u;o.textContent=a.u+' · '+a.r;sel.appendChild(o);
   });
+  // 登录表单自动预填：默认 admin / 123456；下拉切换账号即回填
+  function setVal(el,v){var s=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+  function fillAccount(u){var ins=[].slice.call(document.querySelectorAll('input'));var user=ins.filter(function(i){return i.placeholder==='请输入用户名';})[0];var pass=ins.filter(function(i){return i.placeholder==='密码';})[0];if(user&&pass){setVal(user,u);setVal(pass,'123456');}}
+  sel.addEventListener('change',function(){fillAccount(sel.value);});
+  setInterval(function(){var ins=[].slice.call(document.querySelectorAll('input'));var user=ins.filter(function(i){return i.placeholder==='请输入用户名';})[0];var pass=ins.filter(function(i){return i.placeholder==='密码';})[0];if(user&&pass&&user.value===''&&pass.value===''){fillAccount(sel.value);}},600);
   document.getElementById('dp-toggle').onclick=function(){var p=document.getElementById('demo-panel');p.classList.toggle('collapsed');document.getElementById('dp-caret').textContent=p.classList.contains('collapsed')?'▸':'▾';};
   document.getElementById('dp-gh').onclick=function(){window.open('https://github.com/JunyuZhan/law-firm-demo','_blank');};
   document.getElementById('dp-reset').onclick=function(){
