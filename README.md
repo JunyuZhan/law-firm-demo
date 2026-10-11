@@ -4,7 +4,7 @@
 > 客户、案件、文书、档案、财务、行政、人事、知识库、审批、数据报表——十大业务板块、80+ 功能页面，一站式打通律所日常运营的每一个环节。
 
 <p align="center">
-  <a href="https://junyuzhan.github.io/"><img src="https://img.shields.io/badge/在线演示-junyuzhan.github.io-00a3ff?logo=githubpages&logoColor=white" alt="在线演示"></a>
+  <a href="https://lawfirm.zhanjunyu.com/"><img src="https://img.shields.io/badge/在线演示-lawfirm.zhanjunyu.com-00a3ff?logo=googlechrome&logoColor=white" alt="在线演示"></a>
   <img src="https://img.shields.io/badge/Vue-3.x-42b883?logo=vue.js&logoColor=white" alt="Vue">
   <img src="https://img.shields.io/badge/Ant%20Design%20Vue-4.x-1677ff?logo=antdesign&logoColor=white" alt="Ant Design Vue">
   <img src="https://img.shields.io/badge/Vben%20Admin-5.x-1b1b1f" alt="Vben Admin">
@@ -91,7 +91,7 @@
 
 ## 🚀 在线体验
 
-访问 **[https://junyuzhan.github.io/](https://junyuzhan.github.io/)**，使用以下任意演示账号登录（密码均为 `123456`，滑动验证拖动即可通过）：
+访问 **[https://lawfirm.zhanjunyu.com/](https://lawfirm.zhanjunyu.com/)**，使用以下任意演示账号登录（密码均为 `123456`，滑动验证拖动即可通过）：
 
 | 账号 | 角色 | 权限范围 |
 |---|---|---|
@@ -128,6 +128,12 @@
 - 🐙 GitHub：[@JunyuZhan](https://github.com/JunyuZhan)
 - 💼 专注企业级中后台系统与法律科技（LegalTech）产品研发
 
+<p align="center">
+  <img src="assets/wechat-qr.png" alt="扫码添加开发者微信 · junyuzhan（詹俊宇）" width="220">
+  <br>
+  <sub>📱 微信扫码添加开发者，咨询演示、报价与定制开发</sub>
+</p>
+
 ---
 
 ## 💰 获取与授权
@@ -135,7 +141,14 @@
 本系统提供**完整商业源码**（含 Spring Boot 后端、前端工程、数据库脚本、部署文档），适合律所信息化、法律科技二次开发、毕业设计 / 课程项目等场景。
 
 - 📩 **商务合作 / 源码获取**：请邮件联系 <junyuzhan@outlook.com>，注明使用场景与需求。
-- 💬 支持私有化部署指导、功能定制、二次开发咨询。
+- 💬 **微信咨询**：扫描下方二维码添加开发者微信，快速沟通演示、报价与定制需求。
+- 🛠️ 支持私有化部署指导、功能定制、二次开发咨询。
+
+<p align="center">
+  <img src="assets/wechat-qr.png" alt="微信扫码 · junyuzhan（詹俊宇）" width="240">
+  <br>
+  <sub>长按 / 扫码添加微信，备注「律所系统」优先通过</sub>
+</p>
 
 > 演示站点仅用于产品展示，不包含完整后端源码；最终交付以双方约定为准。
 
