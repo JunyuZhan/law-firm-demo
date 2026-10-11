@@ -8,7 +8,7 @@
  * 这与前端 @vben/request 的 defaultResponseInterceptor 约定一致。
  * ==========================================================================*/
 
-const SW_VERSION = 'demo-v1.0.0';
+const SW_VERSION = 'demo-v1.0.1';
 const API_PREFIX = '/api';
 const SHELL_CACHE = `lawfirm-shell-${SW_VERSION}`;
 const PRECACHE = [
@@ -49,6 +49,19 @@ function dateTimeAgo(n) {
   d.setDate(d.getDate() - n);
   d.setHours(ri(8, 19), ri(0, 59), 0, 0);
   return d.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+/* 生成一张可渲染的占位验证码/滑块底图（内联 SVG，无需外部资源） */
+function captchaDataUri() {
+  const w = 320, h = 160;
+  const colors = ['#1677ff', '#52c41a', '#fa8c16', '#eb2f96', '#722ed1'];
+  let circles = '';
+  for (let i = 0; i < 18; i++) {
+    const x = ri(0, w), y = ri(0, h), r = ri(6, 26), c = pick(colors);
+    circles += `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" opacity="0.18"/>`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f5f7fa"/>${circles}<text x="50%" y="52%" font-size="34" font-family="monospace" fill="#333" text-anchor="middle" dominant-baseline="middle">MOCK</text></svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
 /* ---------------------------------------------------------------------------
@@ -957,8 +970,16 @@ async function routeApi(method, apiPath, params, body, req) {
   const tokenUser = parseToken(auth.replace(/^Bearer\s*/, ''));
 
   // ---- 认证相关 ----
+  // 滑块/图片验证码令牌：对齐前端 At() 期望的 { captchaId, captchaUrl } 形状，
+  // 同时保留字段供组件读取；captchaUrl 为可渲染的占位图，避免空白/破图。
   if (apiPath === '/auth/slider/token') {
-    return { tokenId: 'slider-demo', targetPosition: ri(120, 260), expireSeconds: 60 };
+    return {
+      captchaId: 'slider-demo',
+      captchaUrl: captchaDataUri(),
+      tokenId: 'slider-demo',
+      targetPosition: ri(120, 260),
+      expireSeconds: 60,
+    };
   }
   if (apiPath === '/auth/slider/verify') {
     return { message: '验证通过', success: true, verifyToken: 'slider-verify-demo' };
@@ -967,7 +988,7 @@ async function routeApi(method, apiPath, params, body, req) {
     return { captchaRequired: false, failCount: 0, locked: false, lockRemainingMinutes: 0 };
   }
   if (apiPath === '/auth/captcha') {
-    return { captchaId: 'cap-demo', captchaUrl: 'data:image/svg+xml;base64,' };
+    return { captchaId: 'cap-demo', captchaUrl: captchaDataUri() };
   }
   if (apiPath === '/auth/login') {
     const username = (body && body.username ? String(body.username) : '').toLowerCase();
