@@ -8,7 +8,7 @@
  * 这与前端 @vben/request 的 defaultResponseInterceptor 约定一致。
  * ==========================================================================*/
 
-const SW_VERSION = 'demo-v1.0.1';
+const SW_VERSION = 'demo-v1.0.2';
 const API_PREFIX = '/api';
 const SHELL_CACHE = `lawfirm-shell-${SW_VERSION}`;
 const PRECACHE = [
