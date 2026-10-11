@@ -63,14 +63,17 @@
     document.head.appendChild(n);
     e.remove();
   }
+  // 版本号须与 sw.js 内 SW_VERSION 保持一致；每次改动 sw.js 请同步此处，
+  // 否则 Cloudflare 的 4h 缓存会一直吐旧 sw.js（表现为 /api 旧报错复现）。
+  var SW_VER = 'demo-v1.0.2';
   function boot(){
     if(!('serviceWorker' in navigator)){ loadApp(); return; }
-    navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(function(){
-      // SW 已接管本页则直接加载；否则等接管事件（sw.js 内 clients.claim() 会触发）
-      if(navigator.serviceWorker.controller){ loadApp(); return; }
+    // 注册带版本号的 URL：Cloudflare 按 URL 缓存，换版本即 cache MISS，强制拉新 sw.js
+    navigator.serviceWorker.register('/sw.js?__v='+encodeURIComponent(SW_VER),{scope:'/',updateViaCache:'none'}).then(function(reg){
+      // 仅当“本次注册的 SW”已真正接管本页时才立即加载；否则等 clients.claim 触发的
+      // controllerchange 后再加载。避免“旧 SW 仍接管时就提前启动应用”→ /api 仍 404。
+      if(navigator.serviceWorker.controller && reg.active && navigator.serviceWorker.controller === reg.active){ loadApp(); return; }
       navigator.serviceWorker.addEventListener('controllerchange', loadApp);
-      // 兜底：极少数情况下 controllerchange 未触发，3s 后仍然加载（此时 SW 通常已激活）
-      setTimeout(function(){ if(!window.__appLoaded) loadApp(); }, 3000);
     }).catch(function(e){ console.warn('SW 注册失败',e); loadApp(); });
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); }
