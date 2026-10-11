@@ -1,49 +1,101 @@
-# 智慧律所管理系统 · 开源演示版（law-firm-demo）
+# 🏛️ 智慧律所管理系统 · lawfirm
 
-> 本仓库是 [lawfirm](https://github.com/JunyuZhan) 项目的**开源演示站点**。原项目（含后端 Spring Boot 与前端源码）为闭源，本仓库**不复制其源码**，而是直接部署其前端构建产物，并用浏览器内的 **Mock Service Worker** 充当后端，让访客无需任何服务器即可在线体验完整的律所管理系统。
+> **一套为现代律师事务所量身打造的全流程数字化管理平台**
+> 客户、案件、文书、档案、财务、行政、人事、知识库、审批、数据报表——十大业务板块、80+ 功能页面，一站式打通律所日常运营的每一个环节。
 
-访问地址（部署后）：`https://junyuzhan.github.io/`
+<p align="center">
+  <a href="https://junyuzhan.github.io/"><img src="https://img.shields.io/badge/在线演示-junyuzhan.github.io-00a3ff?logo=githubpages&logoColor=white" alt="在线演示"></a>
+  <img src="https://img.shields.io/badge/Vue-3.x-42b883?logo=vue.js&logoColor=white" alt="Vue">
+  <img src="https://img.shields.io/badge/Ant%20Design%20Vue-4.x-1677ff?logo=antdesign&logoColor=white" alt="Ant Design Vue">
+  <img src="https://img.shields.io/badge/Vben%20Admin-5.x-1b1b1f" alt="Vben Admin">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
+</p>
 
----
+<p align="center">
+  <img src="assets/shots/dashboard.png" alt="智慧律所管理系统 · 工作台仪表盘" width="100%">
+</p>
 
-## 它是怎么工作的
-
-GitHub Pages 只能托管静态文件，跑不了真正的 Spring Boot 后端。本演示用一条关键思路解决：
-
-1. **前端产物 1:1 复用**：直接部署 `lawfirm` 项目 `frontend/apps/web-antd` 的构建产物（`dist/`），界面、交互、组件与原系统完全一致。
-2. **Mock 后端跑在浏览器里**：站点根目录下的 `sw.js` 是一个 Service Worker，在网络层拦截所有 `/api/**` 请求（包括 axios 发起的 XHR 请求），由内置的 Mock 数据库返回演示数据与登录态。
-3. **数据持久化在浏览器内**：Mock 数据库的增删改通过 IndexedDB 保存，刷新后仍在；点击"重置演示数据"可恢复初始状态。
-
-这样做的好处：仓库完全静态、零运维、克隆即跑，非常适合作为产品演示 / 招聘展示 / 教学样例。
-
----
-
-## 功能模块（广度覆盖）
-
-演示菜单按原系统 7 大板块组织，覆盖 80+ 个页面，每个菜单均指向真实存在的视图组件：
-
-- **工作台**：首页 / 数据分析 / 审批概览 / 我的工作区
-- **客户管理**：客户列表 / 案源管理 / 利益冲突审查
-- **案件管理**：案件列表 / 我的案件 / 案件合同 / 任务管理 / 工时记录
-- **文书管理**：文书列表 / 我的文书 / 文书模板 / 用印管理 / 用印申请 / 文书创作 / 卷宗模板
-- **档案管理**：档案列表 / 借阅管理 / 销毁管理 / 推送状态
-- **财务管理**：合同 / 合同模板 / 合同变更 / 发票 / 收款 / 预收 / 付款 / 报销 / 提成 / 我的提成 / 我的收款 / AI 计费 / 财务报表
-- **行政管理**：资产 / 资产盘点 / 考勤 / 用章合同 / 外出 / 请假 / 介绍信 / 会议纪要 / 会议室 / 加班 / 采购 / 供应商
-- **人事管理**：员工 / 人事合同 / 考勤 / 请假 / 薪资 / 我的薪资 / 绩效 / 晋升 / 转正 / 离职 / 培训 / 发展计划
-- **知识库**：文章 / 案例 / 法规 / 质检标准
-- **工作流**：审批中心 / 报告管理 / 报告模板 / 日程管理 / 定时报告
-- **系统管理**：用户 / 角色 / 部门 / 字典 / 菜单 / 配置 / 操作日志 / 公告 / 备份 / 提成配置 / 集成 / 迁移 / 权限矩阵
-- **其他**：数据交接 / 文档预览 / AI 用量
+> 💡 **关于在线演示**：上方演示站点为本系统的「纯前端 + 浏览器内 Mock 数据」版本，无需后端即可完整体验全部界面与交互。有意获取**包含 Spring Boot 后端与生产级数据库**的完整商业源码，请见文末「获取与授权」。
 
 ---
 
-## 演示账号
+## ✨ 产品亮点
 
-所有账号密码均为 `123456`（登录页右下角"演示控制台"可一键复制）：
+- **🧭 一体化工作台**：登录即可见全局数据看板——在办案件、本月营收、待办审批、客户增长一目了然。
+- **👥 精细化客户管理**：客户档案、案源线索、利益冲突审查三管齐下，从源头规避执业风险。
+- **⚖️ 全生命周期案件管理**：从立案、合同、任务到工时，案件进展全程留痕、责任到人。
+- **📑 文书与用印闭环**：文书模板、在线拟稿、用印审批一体化，关键节点可审计、可追溯。
+- **🗄️ 智能档案管理**：卷宗归档、借阅、销毁全流程电子化管理，调阅效率倍增。
+- **💰 业财一体化财务**：合同、发票、收款、付款、报销、提成、财务报表，财务数据自动汇总。
+- **🏢 行政人事一体化**：资产、会议室、采购、供应商、员工、薪资、绩效——事务所运转的后台基石。
+- **📚 律所知识库**：法规、案例、实务文章沉淀为组织资产，新人培养与办案参考随手可得。
+- **🔄 可配置审批流**：报告、用印、请假、外出等审批中心统一收口，流程透明可追踪。
+- **📊 多维度数据报表**：营收、案件、客户、律师绩效多视角统计分析，辅助管理决策。
 
-| 账号 | 角色 | 说明 |
+---
+
+## 🧩 功能模块（十大板块 · 80+ 页面）
+
+### 一、工作台 / 数据分析
+首页仪表盘 · 数据分析 · 审批概览 · 我的工作区
+
+### 二、客户管理（CRM）
+客户列表 · 案源管理 · 利益冲突审查
+
+### 三、案件管理
+案件列表 · 我的案件 · 案件合同 · 任务管理 · 工时记录
+
+### 四、文书管理
+文书列表 · 我的文书 · 文书模板 · 用印管理 · 用印申请 · 文书创作 · 卷宗模板
+
+### 五、档案管理
+档案列表 · 借阅管理 · 销毁管理 · 推送状态
+
+### 六、财务管理
+合同 · 合同模板 · 合同变更 · 发票 · 收款 · 预收 · 付款 · 报销 · 提成 · 我的提成 · 我的收款 · AI 计费 · 财务报表
+
+### 七、行政管理
+资产 · 资产盘点 · 考勤 · 用章合同 · 外出 · 请假 · 介绍信 · 会议纪要 · 会议室 · 加班 · 采购 · 供应商
+
+### 八、人事管理（HR）
+员工 · 人事合同 · 考勤 · 请假 · 薪资 · 我的薪资 · 绩效 · 晋升 · 转正 · 离职 · 培训 · 发展计划
+
+### 九、知识库
+文章 · 案例 · 法规 · 质检标准
+
+### 十、工作流 & 系统管理
+审批中心 · 报告管理 · 报告模板 · 日程管理 · 定时报告 ｜ 用户 · 角色 · 部门 · 字典 · 菜单 · 配置 · 操作日志 · 公告 · 备份 · 提成配置 · 集成 · 迁移 · 权限矩阵
+
+---
+
+## 📸 界面一览
+
+> 以下截图均取自真实系统界面（演示数据），直观呈现各业务板块的实际效果。
+
+| 模块 | 界面预览 |
+|---|---|
+| 👥 客户管理 | ![crm-client](assets/shots/crm-client.png) |
+| ⚖️ 案件列表 | ![matter-list](assets/shots/matter-list.png) |
+| 📑 案件合同 | ![matter-contract](assets/shots/matter-contract.png) |
+| 🗂️ 档案管理 | ![archive-list](assets/shots/archive-list.png) |
+| 💰 财务合同 | ![finance-contract](assets/shots/finance-contract.png) |
+| 💸 财务报表 | ![finance-report](assets/shots/finance-report.png) |
+| 🏢 资产管理 | ![admin-asset](assets/shots/admin-asset.png) |
+| 🛒 采购管理 | ![admin-purchase](assets/shots/admin-purchase.png) |
+| 👨‍💼 人事员工 | ![hr-employee](assets/shots/hr-employee.png) |
+| 📚 知识库法规 | ![knowledge-law](assets/shots/knowledge-law.png) |
+| 🔄 审批中心 | ![workbench-approval](assets/shots/workbench-approval.png) |
+| 📊 数据分析 | ![workbench-report](assets/shots/workbench-report.png) |
+
+---
+
+## 🚀 在线体验
+
+访问 **[https://junyuzhan.github.io/](https://junyuzhan.github.io/)**，使用以下任意演示账号登录（密码均为 `123456`，滑动验证拖动即可通过）：
+
+| 账号 | 角色 | 权限范围 |
 |---|---|---|
-| `admin` | 超级管理员 | 全部权限 |
+| `admin` | 超级管理员 | 全部功能与系统设置 |
 | `director` | 主任 | 全部权限 |
 | `lawyer1` | 主办律师 | 案件 / 客户 / 合同 / 文书 |
 | `leader` | 团队负责人 | 案件 / 客户 / 合同 |
@@ -51,13 +103,47 @@ GitHub Pages 只能托管静态文件，跑不了真正的 Spring Boot 后端。
 | `staff` | 行政 | 资产 / 会议室 / 员工 |
 | `trainee` | 实习律师 | 案件查看 |
 
-> 登录流程中的滑动验证为演示直通：任意拖动滑块即可通过；任意密码均可登录（仅作演示，不校验真实口令）。
+> ⚠️ 演示站点为「前端 + 浏览器内 Mock 数据」，所见即真实界面；登录、增删改等交互均已打通，数据保存在浏览器本地，刷新不丢失，可随时「重置演示数据」。
 
 ---
 
-## 本地预览
+## 🛠️ 技术架构
 
-由于 Service Worker 需要**安全上下文**，本地预览请用 `localhost`（HTTPS 或 localhost 均满足），不要用 `file://` 直接打开。
+| 层级 | 技术选型 |
+|---|---|
+| 前端框架 | Vue 3 + TypeScript + Vite |
+| UI 组件 | Ant Design Vue 4 + Vben Admin（企业级中后台脚手架） |
+| 状态 / 请求 | Pinia + Axios + 统一响应拦截 |
+| 权限模型 | 基于角色的访问控制（RBAC）+ 动态菜单 |
+| 后端（完整版） | Spring Boot + MyBatis / JPA + MySQL |
+| 部署形态 | 支持私有化部署 / 云部署；本演示为纯静态 + 浏览器内 Mock |
+
+---
+
+## 👤 开发者
+
+**junyuzhan（詹俊宇）**
+
+- 📧 邮箱：<junyuzhan@outlook.com>
+- 🐙 GitHub：[@JunyuZhan](https://github.com/JunyuZhan)
+- 💼 专注企业级中后台系统与法律科技（LegalTech）产品研发
+
+---
+
+## 💰 获取与授权
+
+本系统提供**完整商业源码**（含 Spring Boot 后端、前端工程、数据库脚本、部署文档），适合律所信息化、法律科技二次开发、毕业设计 / 课程项目等场景。
+
+- 📩 **商务合作 / 源码获取**：请邮件联系 <junyuzhan@outlook.com>，注明使用场景与需求。
+- 💬 支持私有化部署指导、功能定制、二次开发咨询。
+
+> 演示站点仅用于产品展示，不包含完整后端源码；最终交付以双方约定为准。
+
+---
+
+## ⚙️ 本地运行（演示版）
+
+演示版为纯静态站点，使用 Service Worker 在浏览器内提供 Mock 接口，本地预览需通过 `localhost` 访问（Service Worker 要求安全上下文）：
 
 ```bash
 # 在仓库根目录启动任意静态服务器
@@ -66,58 +152,10 @@ python3 -m http.server 8080
 open http://localhost:8080
 ```
 
-首次打开后，Service Worker 会自动注册并接管 `/api` 请求；若登录页接口无响应，刷新一次页面即可（等待 SW 激活）。
+首次打开后 Service Worker 会自动注册并接管 `/api` 请求；若登录页接口无响应，刷新一次页面等待 SW 激活即可。
 
 ---
 
-## 部署到 GitHub Pages（User Page）
+## 📄 版权与免责
 
-本仓库以 User Page 形式部署（`junyuzhan.github.io`），站点根路径为 `/`，因此**无需重新构建前端**，直接推送静态文件即可。
-
-```bash
-git clone <this-repo> && cd <this-repo>
-# 文件已在仓库根目录，直接推送
-git add -A && git commit -m "deploy demo" && git push
-# 在 GitHub 仓库 Settings → Pages 选择 main 分支 /(root) 即可
-```
-
-开启 Pages 后访问 `https://junyuzhan.github.io/`。
-
-> 若改为 Project Page（`law-firm-demo` 形式，路径 `/law-firm-demo/`），则需重新构建前端并将 `VITE_BASE` 与 `VITE_GLOB_API_URL` 改为对应子路径——本仓库默认按 User Page 组织。
-
----
-
-## 重置演示数据
-
-- 页面右下角"演示模式"面板 → **重置演示数据** 按钮。
-- 或调用接口：`POST /api/demo/reset`（需 SW 已激活），随后刷新页面。
-
----
-
-## 已知限制（演示范畴）
-
-- 数据均为浏览器内 Mock，不与任何真实后端通信；增删改仅保存在本机 IndexedDB。
-- 部分深层子功能（如用印申请审批流、文书在线编辑、OCR、OnlyOffice 预览）因依赖原系统专有服务，演示中返回占位或空数据，不保证完整闭环。
-- 列表/详情/增删改等主体功能已对接 Mock 数据；个别页面因原接口字段差异可能显示为空，属预期范围。
-- 导出 / 下载类接口返回占位文本，不生成真实文件。
-
----
-
-## 目录结构
-
-```
-law-firm-demo/
-├── index.html          # 前端入口（注入 SW 注册 + 演示控制台）
-├── sw.js               # Mock Service Worker：拦截 /api 并提供演示数据
-├── _app.config.js      # 前端运行时配置（API 前缀 = /api）
-├── css/ js/ jse/       # 前端构建产物（来自 lawfirm 项目，1:1）
-├── favicon.ico manifest.webmanifest logo.png ...  # 静态资源
-├── .nojekyll           # 禁用 Jekyll，避免 _app.config.js 等下划线文件被忽略
-└── README.md
-```
-
----
-
-## License
-
-本演示站点仅包含前端构建产物与 Mock 适配层，不包含 `lawfirm` 项目源码。演示数据与界面版权归原作者所有，仅供展示与学习使用。
+本仓库演示站点由前端构建产物与浏览器内 Mock 适配层组成，版权归开发者 **junyuzhan（詹俊宇）** 所有。未经授权不得用于商业转售；如需商用，请通过上述渠道获取正式授权。
