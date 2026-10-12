@@ -1,4 +1,7 @@
-<!doctype html><html lang="zh"><head><script src="/_app.config.js?v=1.0.0-beta.3-7362080d"></script><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><meta name="renderer" content="webkit"/><meta name="description" content="智慧律所管理系统 - 律师事务所业务管理系统"/><meta name="keywords" content="律所管理,律师事务所,业务管理,Law Firm Management"/><meta name="author" content="junyuzhan"/><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=0"/><title>智慧律所管理系统</title><link rel="icon" href="/favicon.ico"/><link rel="manifest" href="/manifest.webmanifest"/><meta name="theme-color" content="#1890ff"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="default"/><meta name="apple-mobile-web-app-title" content="律所系统"/><link rel="apple-touch-icon" href="/pwa-192x192.png"/><script type="text/plain" id="app-entry" crossorigin src="/jse/index-index-BBo-se1k.js"></script></head><body><script data-app-loading="inject-js">var theme = localStorage.getItem('智慧律所管理系统-1.0.0-beta.3-prod-preferences-theme');
+<!doctype html><html lang="zh"><head><script src="/_app.config.js?v=1.0.0-beta.3-7362080d"></script><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><meta name="renderer" content="webkit"/><meta name="description" content="智慧律所管理系统 - 律师事务所业务管理系统"/><meta name="keywords" content="律所管理,律师事务所,业务管理,Law Firm Management"/><meta name="author" content="junyuzhan"/><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=0"/><title>智慧律所管理系统</title><link rel="icon" href="/favicon.ico"/><link rel="manifest" href="/manifest.webmanifest"/>
+<!-- 预加载登录页必需的核心分块（与 sw.js / 应用入口并行下载，摊掉高延迟下的往返开销） -->
+<link rel="modulepreload" href="/js/bootstrap-BKAhjMte.js"/>
+<link rel="modulepreload" href="/js/index-BZWaydKo.js"/><meta name="theme-color" content="#1890ff"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="default"/><meta name="apple-mobile-web-app-title" content="律所系统"/><link rel="apple-touch-icon" href="/pwa-192x192.png"/><script type="text/plain" id="app-entry" crossorigin src="/jse/index-index-BBo-se1k.js"></script></head><body><script data-app-loading="inject-js">var theme = localStorage.getItem('智慧律所管理系统-1.0.0-beta.3-prod-preferences-theme');
   document.documentElement.classList.toggle('dark', /dark/.test(theme));</script><style data-app-loading="inject-css">html{line-height:1.15}.loading{align-items:center;background-color:#f4f7f9;display:flex;flex-direction:column;height:100%;justify-content:center;left:0;overflow:hidden;position:fixed;top:0;width:100%;z-index:9999}.loading.hidden{opacity:0;pointer-events:none;transition:all .8s ease-out;visibility:hidden}.dark .loading{background:#0d0d10}.title{color:rgba(0,0,0,.85);font-size:28px;font-weight:600;margin-top:66px}.dark .title{color:#fff}.loader{height:48px;position:relative;width:48px}.loader:before{animation:shadow-ani .5s linear infinite;background:rgba(0,128,255,.5);background:hsl(var(--primary,210 100% 50%)/50%);border-radius:50%;content:"";height:5px;left:0;position:absolute;top:60px;width:48px}.loader:after{animation:jump-ani .5s linear infinite;background:#0080ff;background:hsl(var(--primary,210 100% 50%));border-radius:4px;content:"";height:100%;left:0;position:absolute;top:0;width:100%}@keyframes jump-ani{15%{border-bottom-right-radius:3px}25%{transform:translateY(9px) rotate(22.5deg)}50%{border-bottom-right-radius:40px;transform:translateY(18px) scaleY(.9) rotate(45deg)}75%{transform:translateY(9px) rotate(67.5deg)}to{transform:translateY(0) rotate(90deg)}}@keyframes shadow-ani{0%,to{transform:scale(1)}50%{transform:scaleX(1.2)}}</style><div class="loading" id="__app-loading__"><div class="loader"></div><div class="title">智慧律所管理系统</div></div><div id="app"></div>
 <!-- ===== 演示控制台（部署时注入，非应用源码） ===== -->
 <style>
@@ -83,80 +86,99 @@
     caches: (typeof caches !== 'undefined') ? caches : { open: function(){ return Promise.resolve({ addAll:function(){}, put:function(){}, match:function(){} }); }, keys:function(){return Promise.resolve([]);}, delete:function(){} }
   };
 
+  // 3) Mock 请求处理器（由 sw.js 提供，先置空） + 请求队列
+  var fetchHandler = null;
+  var _apiQueue = [];
+  var _handlerReady = false;
+  function mockFetch(url, opts){
+    opts = opts || {};
+    var req = new Request(url, { method: (opts.method||'GET'), headers: opts.headers, body: opts.body });
+    var event = { request: req, respondWith: function(p){ event._p = p; } };
+    fetchHandler(event);
+    return event._p;
+  }
+  // Mock 就绪前先把 /api 请求入队，就绪后统一重放 —— 这样应用可立即并行下载，无需等 sw.js
+  function dispatch(url, opts){
+    if(fetchHandler){ return mockFetch(url, opts); }
+    return _origFetch ? _origFetch(url, opts) : Promise.reject(new Error('mock unavailable'));
+  }
+  function flushQueue(){
+    if(!_handlerReady) return;
+    var q = _apiQueue; _apiQueue = [];
+    q.forEach(function(it){ dispatch(it.url, it.opts).then(it.resolve).catch(it.reject); });
+  }
+
+  // 4) 预装拦截器（fetch + XHR）：/api 在 Mock 就绪前入队，就绪后直连
+  var _origFetch = window.fetch ? window.fetch.bind(window) : null;
+  window.fetch = function(input, init){
+    var u = (typeof input==='string') ? input : (input && input.url) || '';
+    var abs = new URL(u, location.href).href;
+    if(new URL(abs).pathname.startsWith('/api')){
+      if(_handlerReady) return dispatch(abs, init);
+      return new Promise(function(res, rej){ _apiQueue.push({ url:abs, opts:init, resolve:res, reject:rej }); });
+    }
+    return _origFetch ? _origFetch(input, init) : fetch(input, init);
+  };
+  var _NativeXHR = window.XMLHttpRequest;
+  function MockXHR(){
+    this._headers = {}; this._method='GET'; this._url=''; this._async=true; this.withCredentials=false;
+    this.readyState=0; this.status=0; this.statusText=''; this.responseText=''; this.response=null;
+    this.onreadystatechange=null; this.onload=null; this.onerror=null; this.onloadend=null;
+  }
+  MockXHR.prototype.open = function(m,u,a){ this._method=m; this._url=u; this._async=(a!==false); };
+  MockXHR.prototype.setRequestHeader = function(k,v){ this._headers[k]=v; };
+  MockXHR.prototype.getAllResponseHeaders = function(){ return this._respHeaders||''; };
+  MockXHR.prototype.getResponseHeader = function(k){ return (this._respHeaderMap && this._respHeaderMap[k.toLowerCase()])||null; };
+  MockXHR.prototype.abort = function(){};
+  MockXHR.prototype.send = function(body){
+    var selfX = this;
+    var abs, path;
+    try { abs = new URL(this._url, location.href).href; path = new URL(abs).pathname; } catch(e){ abs=this._url; path=''; }
+    function settle(resp){
+      selfX.status = resp.status; selfX.statusText = resp.statusText;
+      resp.text().then(function(t){
+        selfX.responseText = t; selfX.response = t;
+        var h=''; var m={}; resp.headers.forEach(function(v,k){ h+=k+': '+v+'\r\n'; m[k.toLowerCase()]=v; });
+        selfX._respHeaders=h; selfX._respHeaderMap=m;
+        selfX.readyState=4;
+        if(selfX.onreadystatechange) selfX.onreadystatechange();
+        if(selfX.onload) selfX.onload();
+        if(selfX.onloadend) selfX.onloadend();
+      });
+    }
+    function fail(e){ selfX.status=500; selfX.statusText=String(e); selfX.readyState=4; if(selfX.onerror) selfX.onerror(e); if(selfX.onloadend) selfX.onloadend(); }
+    if(path.startsWith('/api')){
+      var hdrs = new Headers();
+      for (var k in this._headers) hdrs.set(k, this._headers[k]);
+      if (body && !hdrs.has('content-type')) hdrs.set('content-type','application/json');
+      var p = _handlerReady
+        ? dispatch(abs, { method:this._method, headers:hdrs, body:body })
+        : new Promise(function(res,rej){ _apiQueue.push({ url:abs, opts:{ method:selfX._method, headers:hdrs, body:body }, resolve:res, reject:rej }); });
+      p.then(settle).catch(fail);
+    } else {
+      var xhr = new _NativeXHR();
+      xhr.open(selfX._method, selfX._url, selfX._async);
+      for (var k2 in selfX._headers) xhr.setRequestHeader(k2, selfX._headers[k2]);
+      xhr.withCredentials = selfX.withCredentials;
+      xhr.onreadystatechange = function(){ selfX.readyState=xhr.readyState; selfX.status=xhr.status; selfX.statusText=xhr.statusText; selfX.responseText=xhr.responseText; selfX.response=xhr.response; if(selfX.onreadystatechange) selfX.onreadystatechange(); };
+      xhr.onload = function(){ if(selfX.onload) selfX.onload(); };
+      xhr.onerror = function(e){ if(selfX.onerror) selfX.onerror(e); };
+      xhr.onloadend = function(){ if(selfX.onloadend) selfX.onloadend(); };
+      xhr.send(body);
+    }
+  };
+  window.XMLHttpRequest = MockXHR;
+
+  // 5) 并行：应用 bundle 与 sw.js 同时下载；Mock 先入队，就绪后重放。
+  //    不再等 sw.js 拉完才加载应用（旧逻辑会多等一次串行往返），首屏更快。
   function bootMock(){
+    loadApp();
     fetch('/sw.js').then(function(r){ return r.text(); }).then(function(code){
-      try { (new Function('self', code))(swSelf); } catch(e){ console.warn('Mock 初始化失败', e); loadApp(); return; }
-      var fetchHandler = swSelf._h['fetch'];
-      if(!fetchHandler){ console.warn('Mock 未捕获到 fetch 处理器'); loadApp(); return; }
-
-      function mockFetch(url, opts){
-        opts = opts || {};
-        var req = new Request(url, { method: (opts.method||'GET'), headers: opts.headers, body: opts.body });
-        var event = { request: req, respondWith: function(p){ event._p = p; } };
-        fetchHandler(event);
-        return event._p;
-      }
-
-      // 3) 重写 window.fetch
-      var _origFetch = window.fetch ? window.fetch.bind(window) : null;
-      window.fetch = function(input, init){
-        var u = (typeof input === 'string') ? input : (input && input.url) || '';
-        var abs = new URL(u, location.href).href;
-        if (new URL(abs).pathname.startsWith('/api')) { return mockFetch(abs, init); }
-        return _origFetch ? _origFetch(input, init) : fetch(input, init);
-      };
-
-      // 4) 重写 XMLHttpRequest（vben 的 axios 走 XHR）
-      var _NativeXHR = window.XMLHttpRequest;
-      function MockXHR(){
-        this._headers = {}; this._method='GET'; this._url=''; this._async=true; this.withCredentials=false;
-        this.readyState=0; this.status=0; this.statusText=''; this.responseText=''; this.response=null;
-        this.onreadystatechange=null; this.onload=null; this.onerror=null; this.onloadend=null;
-      }
-      MockXHR.prototype.open = function(m,u,a){ this._method=m; this._url=u; this._async=(a!==false); };
-      MockXHR.prototype.setRequestHeader = function(k,v){ this._headers[k]=v; };
-      MockXHR.prototype.getAllResponseHeaders = function(){ return this._respHeaders||''; };
-      MockXHR.prototype.getResponseHeader = function(k){ return (this._respHeaderMap && this._respHeaderMap[k.toLowerCase()])||null; };
-      MockXHR.prototype.abort = function(){};
-      MockXHR.prototype.send = function(body){
-        var selfX = this;
-        var abs, path;
-        try { abs = new URL(this._url, location.href).href; path = new URL(abs).pathname; } catch(e){ abs=this._url; path=''; }
-        if (path.startsWith('/api')) {
-          var hdrs = new Headers();
-          for (var k in this._headers) hdrs.set(k, this._headers[k]);
-          if (body && !hdrs.has('content-type')) hdrs.set('content-type','application/json');
-          mockFetch(abs, { method: this._method, headers: hdrs, body: body }).then(async function(resp){
-            selfX.status = resp.status; selfX.statusText = resp.statusText;
-            selfX.responseText = await resp.text(); selfX.response = selfX.responseText;
-            var h=''; var m={}; resp.headers.forEach(function(v,k){ h+=k+': '+v+'\r\n'; m[k.toLowerCase()]=v; });
-            selfX._respHeaders=h; selfX._respHeaderMap=m;
-            selfX.readyState=4;
-            if(selfX.onreadystatechange) selfX.onreadystatechange();
-            if(selfX.onload) selfX.onload();
-            if(selfX.onloadend) selfX.onloadend();
-          }).catch(function(e){
-            selfX.status=500; selfX.statusText=String(e); selfX.readyState=4;
-            if(selfX.onerror) selfX.onerror(e); if(selfX.onloadend) selfX.onloadend();
-          });
-        } else {
-          var xhr = new _NativeXHR();
-          xhr.open(selfX._method, selfX._url, selfX._async);
-          for (var k2 in selfX._headers) xhr.setRequestHeader(k2, selfX._headers[k2]);
-          xhr.withCredentials = selfX.withCredentials;
-          xhr.onreadystatechange = function(){ selfX.readyState=xhr.readyState; selfX.status=xhr.status; selfX.statusText=xhr.statusText; selfX.responseText=xhr.responseText; selfX.response=xhr.response; if(selfX.onreadystatechange) selfX.onreadystatechange(); };
-          xhr.onload = function(){ if(selfX.onload) selfX.onload(); };
-          xhr.onerror = function(e){ if(selfX.onerror) selfX.onerror(e); };
-          xhr.onloadend = function(){ if(selfX.onloadend) selfX.onloadend(); };
-          xhr.send(body);
-        }
-      };
-      window.XMLHttpRequest = MockXHR;
-
-      // 5) Mock 就绪，加载应用
-      window.__mockReady = true;
-      loadApp();
-    }).catch(function(e){ console.warn('sw.js 加载失败', e); loadApp(); });
+      try { (new Function('self', code))(swSelf); } catch(e){ console.warn('Mock 初始化失败', e); _handlerReady=true; flushQueue(); return; }
+      fetchHandler = swSelf._h['fetch'];
+      if(!fetchHandler){ console.warn('Mock 未捕获到 fetch 处理器'); }
+      _handlerReady = true; flushQueue();
+    }).catch(function(e){ console.warn('sw.js 加载失败', e); _handlerReady=true; flushQueue(); });
   }
 
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', bootMock); }
