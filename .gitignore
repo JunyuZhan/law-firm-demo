@@ -16,3 +16,6 @@ node_modules/
 # Build caches
 .turbo/
 .cache/
+
+# 内部工作记忆（含私有仓库名/商业策略/基础设施细节，禁止进入公开仓库）
+.workbuddy/
