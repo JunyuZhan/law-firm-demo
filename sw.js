@@ -246,154 +246,172 @@ function parseToken(token) {
 }
 
 /* ---------------------------------------------------------------------------
- * 菜单树 —— 指向 src/views 下真实存在的视图组件，保证每个菜单都能打开页面
- * 故后端菜单模式：前端路由完全由该树生成
+ * 菜单树 —— 与后端 sys_menu 表 1:1 对齐（2026-10-12 从生产库导出）
+ *
+ * 原项目是**后端动态菜单**：`GET /system/menu/user` 由 MenuAppService 实现——
+ *   SELECT DISTINCT m.* FROM sys_menu m
+ *     JOIN sys_role_menu rm ON m.id = rm.menu_id
+ *     JOIN sys_user_role ur ON rm.role_id = ur.role_id
+ *    WHERE ur.user_id = ? AND m.deleted = false AND m.status = 'ENABLED'
+ *    ORDER BY m.sort_order, m.id
+ *   再剔除 BUTTON 类型，按 parent_id 建树（buildTree(0L)）。
+ *
+ * 演示站无后端，故把同一份数据静态化：
+ *   MENU_NODES  —— 去重后的菜单节点表（键＝sys_menu.id）
+ *   ROLE_MENUS  —— 每个角色可见的菜单 id 列表（按 sort_order, id 排序）
+ *   buildMenu(username) 按角色重建出与后端结构、名称、顺序、路径完全一致的树。
+ * 演示账号与生产库 sys_user 一一对应（admin/director/lawyer1/leader/finance/staff/trainee）。
  * ------------------------------------------------------------------------- */
-let _mid = 1;
-function node(name, path, icon, component, menuType, children, opts = {}) {
-  return {
-    id: _mid++,
-    name,
-    path,
-    icon,
-    menuType: menuType || 'MENU',
-    component: component || 'LAYOUT',
-    parentId: 0,
-    sortOrder: _mid,
-    status: 'ENABLED',
-    visible: opts.visible !== false,
-    isCache: opts.isCache !== false,
-    permission: opts.permission || undefined,
-    redirect: opts.redirect || undefined,
-    children: children && children.length ? children : null,
-  };
-}
-function dir(name, path, icon, children, opts) {
-  return node(name, path, icon, 'LAYOUT', 'DIRECTORY', children, opts);
-}
+const MENU_NODES = {
+  "1": {n:"工作台",p:0,t:"MENU",s:1,path:"/dashboard/workspace",c:"dashboard/workspace/index",i:"DashboardOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "2": {n:"系统管理",p:0,t:"DIRECTORY",s:99,path:"/system",c:"LAYOUT",i:"SettingOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "3": {n:"客户管理",p:0,t:"DIRECTORY",s:4,path:"/crm",c:"LAYOUT",i:"TeamOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "4": {n:"项目管理",p:0,t:"DIRECTORY",s:5,path:"/matter",c:"LAYOUT",i:"FolderOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "5": {n:"财务管理",p:0,t:"DIRECTORY",s:6,path:"/finance",c:"LAYOUT",i:"MoneyCollectOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "6": {n:"卷宗管理",p:0,t:"DIRECTORY",s:7,path:"/document",c:"LAYOUT",i:"FileTextOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "8": {n:"档案管理",p:0,t:"DIRECTORY",s:8,path:"/archive",c:"LAYOUT",i:"DatabaseOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "9": {n:"行政管理",p:0,t:"DIRECTORY",s:9,path:"/admin",c:"LAYOUT",i:"BankOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "10": {n:"人力资源",p:0,t:"DIRECTORY",s:10,path:"/hr",c:"LAYOUT",i:"IdcardOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "11": {n:"知识库",p:0,t:"DIRECTORY",s:11,path:"/knowledge",c:"LAYOUT",i:"BookOutlined",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "21": {n:"用户管理",p:2,t:"MENU",s:1,path:"/system/user",c:"system/user/index",i:"UserOutlined",perm:"sys:user:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "22": {n:"角色管理",p:2,t:"MENU",s:2,path:"/system/role",c:"system/role/index",i:"SafetyCertificateOutlined",perm:"sys:role:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "23": {n:"部门管理",p:2,t:"MENU",s:3,path:"/system/dept",c:"system/dept/index",i:"ApartmentOutlined",perm:"sys:dept:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "24": {n:"菜单管理",p:2,t:"MENU",s:4,path:"/system/menu",c:"system/menu/index",i:"MenuOutlined",perm:"sys:menu:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "25": {n:"系统配置",p:2,t:"MENU",s:7,path:"/system/config",c:"system/config/index",i:"ToolOutlined",perm:"sys:config:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "26": {n:"操作日志",p:2,t:"MENU",s:8,path:"/system/log",c:"system/log/index",i:"FileSearchOutlined",perm:"sys:log:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "27": {n:"出函模板",p:9,t:"MENU",s:20,path:"/admin/letter-template",c:"admin/letter-template/index",i:"MailOutlined",perm:"sys:letter-template:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "28": {n:"合同模板",p:5,t:"MENU",s:20,path:"/finance/contract-template",c:"finance/contract-template/index",i:"FileProtectOutlined",perm:"sys:contract-template:list",ca:"2026-01-04T16:14:15",ua:"2026-01-06T11:40:43"},
+  "29": {n:"灾备管理",p:2,t:"MENU",s:9,path:"/system/backup",c:"system/backup/index",i:"DatabaseOutlined",perm:"sys:backup:list",ca:"2026-10-10T11:00:20",ua:"2026-10-10T11:00:20"},
+  "30": {n:"字典管理",p:2,t:"MENU",s:5,path:"/system/dict",c:"system/dict/index",i:"BookOutlined",perm:"sys:dict:list",ca:"2026-10-10T11:00:20",ua:"2026-10-10T11:00:20"},
+  "31": {n:"客户列表",p:3,t:"MENU",s:1,path:"/crm/client",c:"crm/client/index",i:"ContactsOutlined",perm:"client:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "32": {n:"利冲审查",p:3,t:"MENU",s:2,path:"/crm/conflict",c:"crm/conflict/index",i:"SecurityScanOutlined",perm:"conflict:apply",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "33": {n:"案源管理",p:3,t:"MENU",s:3,path:"/crm/lead",c:"crm/lead/index",i:"FunnelPlotOutlined",perm:"lead:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "41": {n:"项目列表",p:4,t:"MENU",s:1,path:"/matter/list",c:"matter/list/index",i:"ProjectOutlined",perm:"matter:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "42": {n:"我的项目",p:4,t:"MENU",s:2,path:"/matter/my",c:"matter/my/index",i:"SolutionOutlined",perm:"matter:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "43": {n:"工时管理",p:4,t:"MENU",s:6,path:"/matter/timesheet",c:"matter/timesheet/index",i:"ClockCircleOutlined",perm:"timesheet:record",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "44": {n:"任务管理",p:4,t:"MENU",s:5,path:"/matter/task",c:"matter/task/index",i:"CheckSquareOutlined",perm:"task:manage",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "45": {n:"合同管理",p:4,t:"MENU",s:3,path:"/matter/contract",c:"matter/contract/index",i:"FileProtectOutlined",perm:"matter:contract:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "51": {n:"合同收款概览",p:5,t:"MENU",s:10,path:"/finance/contract",c:"finance/contract/index",i:"FileProtectOutlined",perm:"finance:contract:view",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "52": {n:"收款管理",p:5,t:"MENU",s:11,path:"/finance/payment",c:"finance/payment/index",i:"PayCircleOutlined",perm:"finance:payment:manage",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "53": {n:"提成管理",p:5,t:"MENU",s:13,path:"/finance/commission",c:"finance/commission/index",i:"PercentageOutlined",perm:"finance:commission:manage",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "54": {n:"发票管理",p:5,t:"MENU",s:15,path:"/finance/invoice",c:"finance/invoice/index",i:"ProfileOutlined",perm:"finance:invoice:manage",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "55": {n:"财务报表",p:5,t:"MENU",s:20,path:"/finance/report",c:"finance/report/index",i:"BarChartOutlined",perm:"finance:report:view",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "56": {n:"收款变更审批",p:5,t:"MENU",s:12,path:"/finance/payment-amendment",c:"finance/payment-amendment/index",i:"AuditOutlined",perm:"fee:amendment:list",ca:"2026-01-05T02:19:31",ua:"2026-01-05T02:19:31"},
+  "57": {n:"我的收款",p:5,t:"MENU",s:1,path:"/finance/my-payment",c:"finance/my-payment/index",i:"WalletOutlined",perm:"finance:my:payment",ca:"2026-01-05T16:00:00",ua:"2026-01-05T16:00:00"},
+  "58": {n:"我的提成",p:5,t:"MENU",s:2,path:"/finance/my-commission",c:"finance/my-commission/index",i:"DollarOutlined",perm:"finance:my:commission",ca:"2026-01-05T16:00:00",ua:"2026-01-05T16:00:00"},
+  "59": {n:"费用报销",p:5,t:"MENU",s:4,path:"/finance/expense",c:"finance/expense/index",i:"AccountBookOutlined",perm:"finance:expense:apply",ca:"2026-01-05T16:00:00",ua:"2026-01-05T16:00:00"},
+  "61": {n:"卷宗列表",p:6,t:"MENU",s:2,path:"/document/list",c:"document/list/index",i:"FileOutlined",perm:"doc:list",ca:"2026-01-04T16:14:15",ua:"2026-01-08T01:43:37"},
+  "62": {n:"文书制作",p:6,t:"MENU",s:3,path:"/document/compose",c:"document/compose/index",i:"FileAddOutlined",perm:"doc:compose",ca:"2026-01-04T16:14:15",ua:"2026-01-08T01:43:37"},
+  "63": {n:"印章管理",p:9,t:"MENU",s:11,path:"/document/seal",c:"document/seal/index",i:"SafetyOutlined",perm:"doc:seal:list",ca:"2026-01-04T16:14:15",ua:"2026-01-07T08:31:53"},
+  "64": {n:"用印申请",p:9,t:"MENU",s:12,path:"/document/seal-apply",c:"document/seal-apply/index",i:"FormOutlined",perm:"doc:seal:apply",ca:"2026-01-04T16:14:15",ua:"2026-01-07T08:31:53"},
+  "81": {n:"档案列表",p:8,t:"MENU",s:1,path:"/archive/list",c:"archive/list/index",i:"FolderOpenOutlined",perm:"archive:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "82": {n:"档案访问",p:8,t:"MENU",s:2,path:"/archive/access",c:"archive/access/index",i:"LinkOutlined",perm:"archive:access:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "83": {n:"档案迁移",p:8,t:"MENU",s:3,path:"/archive/destroy",c:"archive/destroy/index",i:"CloudUploadOutlined",perm:"archive:migrate:apply",ca:"2026-01-04T16:14:15",ua:"2026-01-08T03:06:03"},
+  "91": {n:"考勤管理",p:9,t:"MENU",s:1,path:"/admin/attendance",c:"admin/attendance/index",i:"ClockCircleOutlined",perm:"admin:attendance:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "92": {n:"请假管理",p:9,t:"MENU",s:2,path:"/admin/leave",c:"admin/leave/index",i:"CalendarOutlined",perm:"admin:leave:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "93": {n:"会议室预约",p:9,t:"MENU",s:5,path:"/admin/meeting-room",c:"admin/meeting-room/index",i:"ScheduleOutlined",perm:"admin:meeting:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "94": {n:"资产管理",p:9,t:"MENU",s:20,path:"/admin/asset",c:"admin/asset/index",i:"ShopOutlined",perm:"admin:asset:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "95": {n:"采购管理",p:9,t:"MENU",s:22,path:"/admin/purchase",c:"admin/purchase/index",i:"ShoppingCartOutlined",perm:"admin:purchase:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "96": {n:"供应商管理",p:9,t:"MENU",s:23,path:"/admin/supplier",c:"admin/supplier/index",i:"ShopOutlined",perm:"admin:supplier:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "97": {n:"加班管理",p:9,t:"MENU",s:3,path:"/admin/overtime",c:"admin/overtime/index",i:"ClockCircleOutlined",perm:"admin:overtime:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "98": {n:"资产盘点",p:9,t:"MENU",s:21,path:"/admin/asset-inventory",c:"admin/asset-inventory/index",i:"FileSearchOutlined",perm:"admin:asset:inventory",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "99": {n:"外出管理",p:9,t:"MENU",s:4,path:"/admin/go-out",c:"admin/go-out/index",i:"ExportOutlined",perm:"admin:goout:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "100": {n:"会议记录",p:9,t:"MENU",s:6,path:"/admin/meeting-record",c:"admin/meeting-record/index",i:"FileTextOutlined",perm:"admin:meeting-record:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "101": {n:"培训管理",p:10,t:"MENU",s:2,path:"/hr/training",c:"hr/training/index",i:"ReadOutlined",perm:"hr:training:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "102": {n:"绩效考核",p:10,t:"MENU",s:3,path:"/hr/performance",c:"hr/performance/index",i:"TrophyOutlined",perm:"hr:performance:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "103": {n:"晋升管理",p:10,t:"MENU",s:5,path:"/hr/promotion",c:"hr/promotion/index",i:"RiseOutlined",perm:"hr:promotion:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "104": {n:"发展计划",p:10,t:"MENU",s:6,path:"/hr/development",c:"hr/development/index",i:"AimOutlined",perm:"hr:development:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "105": {n:"转正管理",p:10,t:"MENU",s:4,path:"/hr/regularization",c:"hr/regularization/index",i:"CheckSquareOutlined",perm:"hr:regularization:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "106": {n:"离职管理",p:10,t:"MENU",s:7,path:"/hr/resignation",c:"hr/resignation/index",i:"ExportOutlined",perm:"hr:resignation:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "107": {n:"工资管理",p:5,t:"MENU",s:14,path:"/hr/payroll",c:"hr/payroll/index",i:"DollarOutlined",perm:"payroll:list",ca:"2026-01-06T07:30:04",ua:"2026-01-06T07:30:04"},
+  "108": {n:"我的工资",p:5,t:"MENU",s:3,path:"/hr/payroll/my",c:"hr/payroll/my/index",i:"WalletOutlined",perm:"payroll:my:view",ca:"2026-01-06T07:30:04",ua:"2026-01-06T07:30:04"},
+  "109": {n:"员工档案",p:10,t:"MENU",s:1,path:"/hr/employee",c:"hr/employee/index",i:"UserOutlined",perm:"hr:employee:list",ca:"2026-01-06T07:30:04",ua:"2026-01-06T07:30:04"},
+  "110": {n:"劳动合同",p:10,t:"MENU",s:8,path:"/hr/contract",c:"hr/contract/index",i:"FileProtectOutlined",perm:"hr:contract:list",ca:"2026-01-12T10:00:00",ua:"2026-01-12T10:00:00"},
+  "111": {n:"知识文章",p:11,t:"MENU",s:1,path:"/knowledge/article",c:"knowledge/article/index",i:"FileTextOutlined",perm:"knowledge:article:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "112": {n:"案例库",p:11,t:"MENU",s:2,path:"/knowledge/case",c:"knowledge/case/index",i:"ContainerOutlined",perm:"knowledge:case:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "113": {n:"法规库",p:11,t:"MENU",s:3,path:"/knowledge/law",c:"knowledge/law/index",i:"BookOutlined",perm:"knowledge:law:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "120": {n:"出函管理",p:9,t:"MENU",s:10,path:"/admin/letter",c:"admin/letter/index",i:"MailOutlined",perm:"admin:letter:list",ca:"2026-01-04T16:14:15",ua:"2026-01-04T16:14:15"},
+  "121": {n:"合同查询",p:9,t:"MENU",s:30,path:"/admin/contract",c:"admin/contract/index",i:"FileSearchOutlined",perm:"admin:contract:list",ca:"2026-01-05T02:19:57",ua:"2026-01-05T02:19:57"},
+  "123": {n:"合同变更处理",p:5,t:"MENU",s:16,path:"/finance/contract-amendment",c:"finance/contract-amendment/index",i:"ant-design:diff-outlined",perm:"finance:contract:amendment:view",ca:"2026-01-05T03:55:33",ua:"2026-01-05T03:55:33"},
+  "140": {n:"提成规则配置",p:2,t:"MENU",s:12,path:"/system/commission-config",c:"system/commission-config/index",i:"ant-design:percentage-outlined",perm:"sys:config:list",ca:"2026-01-05T18:00:00",ua:"2026-01-06T11:40:43"},
+  "148": {n:"我的合同",p:4,t:"MENU",s:4,path:"/matter/my-contract",c:"matter/my-contract/index",i:"FileTextOutlined",perm:"matter:contract:view",ca:"2026-01-06T01:27:18",ua:"2026-01-06T01:27:18"},
+  "149": {n:"日程管理",p:0,t:"MENU",s:2,path:"/workbench/schedule",c:"workbench/schedule/index",i:"CalendarOutlined",perm:"schedule:list",ca:"2026-01-06T04:02:22",ua:"2026-01-06T04:02:22"},
+  "159": {n:"外部系统集成",p:2,t:"MENU",s:99,path:"/system/integration",c:"system/integration/index",i:"CloudOutlined",perm:"sys:integration:list",ca:"2026-01-08T04:48:25",ua:"2026-01-08T04:48:25"},
+  "198": {n:"权限矩阵",p:2,t:"MENU",s:6,path:"/system/permission-matrix",c:"system/permission-matrix/index",i:"TableOutlined",perm:"sys:role:list",ca:"2026-01-06T11:40:43",ua:"2026-01-06T11:40:43"},
+  "200": {n:"报表中心",p:0,t:"DIRECTORY",s:12,path:"/workbench/report",c:"LAYOUT",i:"BarChartOutlined",perm:"report:list",ca:"2026-01-06T14:00:00",ua:"2026-01-06T14:00:00"},
+  "207": {n:"数据交接",p:0,t:"MENU",s:13,path:"/data-handover",c:"data-handover/index",i:"ant-design:swap-outlined",ca:"2026-01-06T12:36:22",ua:"2026-01-06T12:36:22"},
+  "701": {n:"审批中心",p:0,t:"MENU",s:3,path:"/dashboard/approval",c:"dashboard/approval/index",i:"ant-design:audit-outlined",perm:"approval:list",ca:"2026-01-05T15:01:30",ua:"2026-01-05T15:01:30"},
+  "713": {n:"文书模板",p:6,t:"MENU",s:4,path:"/document/template",c:"document/template/index",i:"FileTextOutlined",perm:"doc:template:list",ca:"2026-01-08T01:43:37",ua:"2026-01-08T01:43:37"},
+  "714": {n:"我的文书",p:6,t:"MENU",s:1,path:"/document/my",c:"document/my/index",i:"FileTextOutlined",perm:"doc:my:list",ca:"2026-01-08T02:15:45",ua:"2026-01-08T02:15:45"},
+  "715": {n:"卷宗模板",p:6,t:"MENU",s:5,path:"/document/dossier-template",c:"document/dossier-template/index",i:"FileProtectOutlined",perm:"doc:list",ca:"2026-01-08T01:43:37",ua:"2026-01-08T01:43:37"},
+  "760": {n:"预收款管理",p:5,t:"MENU",s:17,path:"/finance/prepayment",c:"finance/prepayment/index",i:"WalletOutlined",perm:"prepayment:list",ca:"2026-01-12T10:00:00",ua:"2026-01-12T10:00:00"},
+  "765": {n:"系统公告",p:2,t:"MENU",s:15,path:"/system/announcement",c:"system/announcement/index",i:"NotificationOutlined",perm:"sys:announcement:list",ca:"2026-01-12T10:00:00",ua:"2026-01-12T10:00:00"},
+  "774": {n:"业务报表",p:200,t:"MENU",s:9,path:"/workbench/report/overview",c:"workbench/report/index",i:"BarChartOutlined",ca:"2026-03-31T09:00:00",ua:"2026-03-31T09:00:00"},
+  "775": {n:"报表模板",p:200,t:"MENU",s:10,path:"/workbench/report-template",c:"workbench/report-template/index",i:"FileTextOutlined",perm:"report:template:list",v:0,ca:"2026-01-12T10:00:00",ua:"2026-10-10T11:00:22"},
+  "780": {n:"定时报表",p:200,t:"MENU",s:11,path:"/workbench/scheduled-report",c:"workbench/scheduled-report/index",i:"ScheduleOutlined",perm:"report:scheduled:list",v:0,ca:"2026-01-12T10:00:00",ua:"2026-10-10T11:00:22"},
+  "785": {n:"质量管理",p:11,t:"MENU",s:10,path:"/knowledge/quality",c:"knowledge/quality/index",i:"SafetyCertificateOutlined",perm:"knowledge:quality:list",ca:"2026-01-12T10:00:00",ua:"2026-01-12T10:00:00"},
+  "5000": {n:"我的AI使用",p:0,t:"MENU",s:99,path:"/personal/ai-usage",c:"personal/ai-usage/index",i:"laptop-outlined",perm:"ai:usage:view",v:0,ca:"2026-10-10T11:00:22",ua:"2026-10-10T11:00:22"},
+  "5100": {n:"AI费用账单",p:5,t:"MENU",s:60,path:"/finance/ai-billing",c:"finance/ai-billing/index",i:"MoneyCollectOutlined",perm:"ai:billing:view",ca:"2026-10-10T11:00:22",ua:"2026-10-10T11:00:22"},
+  "9401": {n:"档案推送状态",p:8,t:"MENU",s:15,path:"/archive/push-status",c:"archive/push-status/index",perm:"archive:push:records",nc:1,ca:"2026-10-10T11:00:22",ua:"2026-10-10T11:00:22"}
+};
 
-function buildMenu() {
-  _mid = 1;
-  const detail = (name, path, component) =>
-    node(name, path, undefined, component, 'MENU', null, { visible: false, isCache: true });
+const ROLE_MENUS = {
+  ADMIN: [1,21,31,41,57,81,91,109,111,714,22,32,42,58,61,82,92,101,112,149,23,33,45,62,83,97,102,108,113,701,3,24,59,99,105,148,713,4,30,44,93,103,715,5,43,100,104,198,6,25,106,8,26,110,9,29,774,10,51,120,775,785,11,52,63,780,56,64,140,200,53,207,107,54,765,9401,123,760,27,28,55,94,98,95,96,121,5100,2,159,5000],
+  DIRECTOR: [1,31,41,57,81,91,109,111,714,32,42,58,61,82,92,101,112,149,23,33,45,62,97,102,108,113,701,3,59,99,105,148,713,4,30,44,93,103,715,5,43,100,104,6,25,106,8,110,9,774,10,51,120,775,785,11,52,63,780,56,64,140,200,53,207,107,54,765,9401,123,760,27,28,55,94,98,95,96,121,5100,2,5000],
+  TEAM_LEADER: [1,31,41,57,81,91,111,714,32,42,58,61,82,92,101,112,149,33,45,62,97,108,113,701,3,59,99,148,4,44,93,103,5,43,6,8,110,9,774,10,51,120,785,11,52,56,64,200,53,207,107,54,9401,55,5000],
+  FINANCE: [1,57,81,91,111,714,58,82,92,112,149,97,108,113,701,59,99,93,5,6,8,110,9,774,10,51,11,52,56,140,200,53,207,107,54,765,9401,123,760,28,55,94,95,96,5100,2,5000],
+  LAWYER: [1,31,41,57,81,91,111,714,32,42,58,61,82,92,101,112,149,33,45,62,97,108,113,701,3,59,99,148,4,44,93,103,5,43,6,8,110,9,774,10,11,64,200,207,9401,5000],
+  ADMIN_STAFF: [1,81,91,109,111,714,61,82,92,101,112,149,62,97,102,108,113,701,59,99,105,713,93,103,715,5,100,104,6,106,8,110,9,10,120,11,63,64,207,765,9401,27,28,94,98,95,96,121,2,5000],
+  TRAINEE: [1,31,41,57,81,91,111,714,32,42,58,61,82,92,101,112,149,45,62,97,108,113,701,3,59,99,148,4,44,93,103,5,43,6,8,110,9,774,10,11,64,200,207,9401,5000]
+};
 
-  return [
-    dir('工作台', '/dashboard', 'DashboardOutlined', [
-      node('工作台首页', '/dashboard', 'DashboardOutlined', 'dashboard/index/index'),
-      node('数据分析', '/dashboard/analytics', 'BarChartOutlined', 'dashboard/analytics/index'),
-      node('审批概览', '/dashboard/approval', 'CheckSquareOutlined', 'dashboard/approval/index'),
-      node('我的工作区', '/dashboard/workspace', 'ProjectOutlined', 'dashboard/workspace/index'),
-    ]),
-    dir('客户管理', '/crm', 'TeamOutlined', [
-      node('客户列表', '/crm/client', 'IdcardOutlined', 'crm/client/index'),
-      node('案源管理', '/crm/lead', 'ContactsOutlined', 'crm/lead/index'),
-      node('利益冲突审查', '/crm/conflict', 'SecurityScanOutlined', 'crm/conflict/index'),
-      detail('客户详情', '/crm/client/detail/:id', 'crm/client/index'),
-    ]),
-    dir('案件管理', '/matter', 'FolderOutlined', [
-      node('案件列表', '/matter/list', 'FolderOpenOutlined', 'matter/list/index'),
-      node('我的案件', '/matter/my', 'SolutionOutlined', 'matter/my/index'),
-      node('案件合同', '/matter/contract', 'FileTextOutlined', 'matter/contract/index'),
-      node('任务管理', '/matter/task', 'CheckSquareOutlined', 'matter/task/index'),
-      node('工时记录', '/matter/timesheet', 'ClockCircleOutlined', 'matter/timesheet/index'),
-      detail('案件详情', '/matter/detail/:id', 'matter/detail/index'),
-    ]),
-    dir('文书管理', '/document', 'FileTextOutlined', [
-      node('文书列表', '/document/list', 'FileOutlined', 'document/list/index'),
-      node('我的文书', '/document/my', 'FileAddOutlined', 'document/my/index'),
-      node('文书模板', '/document/template', 'FileProtectOutlined', 'document/template/index'),
-      node('用印管理', '/document/seal', 'SafetyOutlined', 'document/seal/index'),
-      node('用印申请', '/document/seal-apply', 'FormOutlined', 'document/seal-apply/index'),
-      node('文书创作', '/document/compose', 'EditOutlined', 'document/compose/index'),
-      node('卷宗模板', '/document/dossier-template', 'ContainerOutlined', 'document/dossier-template/index'),
-      detail('文书详情', '/document/detail/:id', 'document/list/index'),
-    ]),
-    dir('档案管理', '/archive', 'DatabaseOutlined', [
-      node('档案列表', '/archive/list', 'ContainerOutlined', 'archive/list/index'),
-      node('借阅管理', '/archive/access', 'ReadOutlined', 'archive/access/index'),
-      node('销毁管理', '/archive/destroy', 'DeleteOutlined', 'archive/destroy/index'),
-      node('推送状态', '/archive/push-status', 'CloudUploadOutlined', 'archive/push-status/index'),
-      detail('档案详情', '/archive/detail/:id', 'archive/detail/index'),
-    ]),
-    dir('财务管理', '/finance', 'MoneyCollectOutlined', [
-      node('合同管理', '/finance/contract', 'FileTextOutlined', 'finance/contract/index'),
-      node('合同模板', '/finance/contract-template', 'FileProtectOutlined', 'finance/contract-template/index'),
-      node('合同变更', '/finance/contract-amendment', 'SwapOutlined', 'finance/contract-amendment/index'),
-      node('发票管理', '/finance/invoice', 'PayCircleOutlined', 'finance/invoice/index'),
-      node('收款管理', '/finance/payment', 'WalletOutlined', 'finance/payment/index'),
-      node('预收管理', '/finance/prepayment', 'AccountBookOutlined', 'finance/prepayment/index'),
-      node('付款管理', '/finance/payment-amendment', 'DollarOutlined', 'finance/payment-amendment/index'),
-      node('报销管理', '/finance/expense', 'ProfileOutlined', 'finance/expense/index'),
-      node('提成管理', '/finance/commission', 'PercentageOutlined', 'finance/commission/index'),
-      node('我的提成', '/finance/my-commission', 'TrophyOutlined', 'finance/my-commission/index'),
-      node('我的收款', '/finance/my-payment', 'RiseOutlined', 'finance/my-payment/index'),
-      node('AI 计费', '/finance/ai-billing', 'AimOutlined', 'finance/ai-billing/index'),
-      node('财务报表', '/finance/report', 'BarChartOutlined', 'finance/report/index'),
-    ]),
-    dir('行政管理', '/admin', 'ToolOutlined', [
-      node('资产管理', '/admin/asset', 'BankOutlined', 'admin/asset/index'),
-      node('资产盘点', '/admin/asset-inventory', 'FunnelPlotOutlined', 'admin/asset-inventory/index'),
-      node('考勤管理', '/admin/attendance', 'ClockCircleOutlined', 'admin/attendance/index'),
-      node('用章合同', '/admin/contract', 'FileTextOutlined', 'admin/contract/index'),
-      node('外出管理', '/admin/go-out', 'ExportOutlined', 'admin/go-out/index'),
-      node('请假管理', '/admin/leave', 'CalendarOutlined', 'admin/leave/index'),
-      node('介绍信', '/admin/letter', 'MailOutlined', 'admin/letter/index'),
-      node('会议纪要', '/admin/meeting-record', 'FileSearchOutlined', 'admin/meeting-record/index'),
-      node('会议室', '/admin/meeting-room', 'ShopOutlined', 'admin/meeting-room/index'),
-      node('加班管理', '/admin/overtime', 'ClockCircleOutlined', 'admin/overtime/index'),
-      node('采购管理', '/admin/purchase', 'ShoppingCartOutlined', 'admin/purchase/index'),
-      node('供应商', '/admin/supplier', 'ApartmentOutlined', 'admin/supplier/index'),
-    ]),
-    dir('人事管理', '/hr', 'UserOutlined', [
-      node('员工管理', '/hr/employee', 'IdcardOutlined', 'hr/employee/index'),
-      node('人事合同', '/hr/contract', 'FileTextOutlined', 'hr/contract/index'),
-      node('考勤记录', '/hr/attendance', 'ClockCircleOutlined', 'hr/attendance/index'),
-      node('请假管理', '/hr/leave', 'CalendarOutlined', 'hr/leave/index'),
-      node('薪资管理', '/hr/payroll', 'WalletOutlined', 'hr/payroll/index'),
-      node('我的薪资', '/hr/payroll/my', 'DollarOutlined', 'hr/payroll/my/index'),
-      node('绩效管理', '/hr/performance', 'TrophyOutlined', 'hr/performance/index'),
-      node('晋升管理', '/hr/promotion', 'RiseOutlined', 'hr/promotion/index'),
-      node('转正管理', '/hr/regularization', 'CheckSquareOutlined', 'hr/regularization/index'),
-      node('离职管理', '/hr/resignation', 'LogoutOutlined', 'hr/resignation/index'),
-      node('培训管理', '/hr/training', 'ReadOutlined', 'hr/training/index'),
-      node('发展计划', '/hr/development', 'AimOutlined', 'hr/development/index'),
-    ]),
-    dir('知识库', '/knowledge', 'BookOutlined', [
-      node('文章', '/knowledge/article', 'ReadOutlined', 'knowledge/article/index'),
-      node('案例', '/knowledge/case', 'FileSearchOutlined', 'knowledge/case/index'),
-      node('法规', '/knowledge/law', 'SafetyCertificateOutlined', 'knowledge/law/index'),
-      node('质检标准', '/knowledge/quality', 'AuditOutlined', 'knowledge/quality/index'),
-    ]),
-    dir('工作流', '/workbench', 'ScheduleOutlined', [
-      node('审批中心', '/workbench/approval', 'CheckSquareOutlined', 'workbench/approval/index'),
-      node('报告管理', '/workbench/report', 'FileTextOutlined', 'workbench/report/index'),
-      node('报告模板', '/workbench/report-template', 'FileProtectOutlined', 'workbench/report-template/index'),
-      node('日程管理', '/workbench/schedule', 'CalendarOutlined', 'workbench/schedule/index'),
-      node('定时报告', '/workbench/scheduled-report', 'ClockCircleOutlined', 'workbench/scheduled-report/index'),
-    ]),
-    dir('系统管理', '/system', 'SettingOutlined', [
-      node('用户管理', '/system/user', 'UserOutlined', 'system/user/index'),
-      node('角色管理', '/system/role', 'SafetyOutlined', 'system/role/index'),
-      node('部门管理', '/system/dept', 'ApartmentOutlined', 'system/dept/index'),
-      node('字典管理', '/system/dict', 'DatabaseOutlined', 'system/dict/index'),
-      node('菜单管理', '/system/menu', 'MenuOutlined', 'system/menu/index'),
-      node('系统配置', '/system/config', 'ToolOutlined', 'system/config/index'),
-      node('操作日志', '/system/log', 'FileSearchOutlined', 'system/log/index'),
-      node('公告管理', '/system/announcement', 'NotificationOutlined', 'system/announcement/index'),
-      node('数据备份', '/system/backup', 'CloudUploadOutlined', 'system/backup/index'),
-      node('提成配置', '/system/commission-config', 'PercentageOutlined', 'system/commission-config/index'),
-      node('系统集成', '/system/integration', 'ApiOutlined', 'system/integration/index'),
-      node('数据迁移', '/system/migration', 'SwapOutlined', 'system/migration/index'),
-      node('权限矩阵', '/system/permission-matrix', 'AuditOutlined', 'system/permission-matrix/index'),
-    ]),
-    dir('个人中心', '/personal', 'IdcardOutlined', [
-      node('AI 用量', '/personal/ai-usage', 'AimOutlined', 'personal/ai-usage/index'),
-    ]),
-    dir('其他', '/misc', 'AppstoreOutlined', [
-      node('数据交接', '/data-handover', 'SwapOutlined', 'data-handover/index'),
-      node('文档预览', '/office-preview', 'EyeOutlined', 'office-preview/index'),
-    ]),
-  ];
+// 演示账号 → 生产库 sys_role.role_code
+const DEMO_MENU_ROLE = {
+  admin: 'ADMIN',
+  director: 'DIRECTOR',
+  lawyer1: 'LAWYER',
+  leader: 'TEAM_LEADER',
+  finance: 'FINANCE',
+  staff: 'ADMIN_STAFF',
+  trainee: 'TRAINEE',
+};
+
+const MENU_TYPE_NAME = { DIRECTORY: '目录', MENU: '菜单', BUTTON: '按钮' };
+
+function buildMenu(username) {
+  const role = DEMO_MENU_ROLE[username] || 'ADMIN';
+  const ids = ROLE_MENUS[role] || ROLE_MENUS.ADMIN;
+  const byParent = {};
+  ids.forEach((id) => {
+    const nd = MENU_NODES[id];
+    if (!nd) return;
+    (byParent[nd.p] = byParent[nd.p] || []).push(id);
+  });
+  Object.keys(byParent).forEach((k) => byParent[k].sort((a, b) => (MENU_NODES[a].s - MENU_NODES[b].s) || (a - b)));
+  function toDTO(id) {
+    const nd = MENU_NODES[id];
+    return {
+      id: Number(id),
+      parentId: nd.p,
+      name: nd.n,
+      path: nd.path || '',
+      component: nd.c || 'LAYOUT',
+      redirect: null,
+      icon: nd.i || '',
+      menuType: nd.t,
+      menuTypeName: MENU_TYPE_NAME[nd.t] || nd.t,
+      permission: nd.perm || null,
+      sortOrder: nd.s,
+      visible: nd.v !== 0,
+      status: 'ENABLED',
+      isExternal: false,
+      isCache: nd.nc !== 1,
+      createdAt: nd.ca,
+      updatedAt: nd.ua,
+      children: (byParent[id] || []).map(toDTO),
+    };
+  }
+  return (byParent[0] || []).map(toDTO);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1069,8 +1087,9 @@ async function routeApi(method, apiPath, params, body, req) {
   }
 
   // ---- 菜单 ----
+  // 按当前登录用户的角色返回真实菜单（对齐后端 MenuAppService.getUserMenuTree）
   if (apiPath === '/system/menu/user') {
-    return buildMenu();
+    return buildMenu(tokenUser);
   }
 
   // ---- 工作台首页聚合（看板 / 待办 / 最近项目 / 待审批） ----
