@@ -8,7 +8,7 @@
  * 这与前端 @vben/request 的 defaultResponseInterceptor 约定一致。
  * ==========================================================================*/
 
-const SW_VERSION = 'demo-v1.7.0';
+const SW_VERSION = 'demo-v1.8.3';
 const API_PREFIX = '/api';
 const SHELL_CACHE = `lawfirm-shell-${SW_VERSION}`;
 const PRECACHE = [
@@ -566,30 +566,14 @@ function enrichCollection(key, arr) {
         if (rec.issueType === undefined) rec.issueType = pick(['文书质量', '卷宗质量', '合同质量', '流程合规']);
         break;
       case 'hr/payroll':
-        if (rec.items === undefined) {
-          const gross = rec.grossSalary || 0;
-          const ded = rec.totalDeduction || 0;
-          rec.items = [{
-            id: rec.id,
-            employeeNo: rec.employeeNo,
-            employeeName: rec.employeeName,
-            income: rec.income,
-            grossAmount: gross,
-            totalGrossAmount: gross,
-            deductionAmount: ded,
-            totalDeductionAmount: ded,
-            netAmount: rec.netSalary,
-            totalNetAmount: rec.netSalary,
-            confirmStatus: rec.confirmStatus,
-            confirmStatusName: rec.confirmStatusName,
-          }];
-        }
-        if (rec.totalGrossAmount === undefined) rec.totalGrossAmount = rec.grossSalary;
-        if (rec.totalDeductionAmount === undefined) rec.totalDeductionAmount = rec.totalDeduction;
-        if (rec.totalNetAmount === undefined) rec.totalNetAmount = rec.netSalary;
-        if (rec.employeeCount === undefined) rec.employeeCount = ri(5, 40);
-        if (rec.totalEmployees === undefined) rec.totalEmployees = rec.employeeCount;
-        if (rec.confirmedCount === undefined) rec.confirmedCount = Math.round(rec.employeeCount * (0.5 + RND() * 0.5));
+        // 汇总一律由明细实算，禁止随机数（否则与明细行对不上）
+        if (!Array.isArray(rec.items)) rec.items = [];
+        if (rec.totalEmployees === undefined) rec.totalEmployees = rec.items.length;
+        if (rec.employeeCount === undefined) rec.employeeCount = rec.totalEmployees;
+        if (rec.confirmedCount === undefined) rec.confirmedCount = rec.items.filter((i) => i.confirmStatus === '已确认').length;
+        if (rec.totalGrossAmount === undefined) rec.totalGrossAmount = rec.items.reduce((s, i) => s + (Number(i.grossAmount) || 0), 0);
+        if (rec.totalDeductionAmount === undefined) rec.totalDeductionAmount = rec.items.reduce((s, i) => s + (Number(i.deductionAmount) || 0), 0);
+        if (rec.totalNetAmount === undefined) rec.totalNetAmount = rec.items.reduce((s, i) => s + (Number(i.netAmount) || 0), 0);
         break;
       case 'matter/contract':
         if (rec.name === undefined) rec.name = rec.contractName;
@@ -833,7 +817,7 @@ function matterOwners() {
 }
 
 const SEED_BUILDERS = {
-  'client': () => Array.from({ length: 42 }, () => {
+  'client': () => Array.from({ length: 5 }, () => {
     const cname = companyName();
     const ctype = pick(['企业', '个人']);
     const owner = fullName();
@@ -858,7 +842,7 @@ const SEED_BUILDERS = {
       responsibleLawyerName: owner,
     });
   }),
-  'client/lead': () => Array.from({ length: 22 }, () => {
+  'client/lead': () => Array.from({ length: 5 }, () => {
     const source = pick(['官网', '转介绍', '市场活动', '电话咨询']);
     const status = pick(['待跟进', '跟进中', '已转化', '已流失']);
     const follow = fullName();
@@ -879,7 +863,7 @@ const SEED_BUILDERS = {
       nextFollowTime: daysAgo(-ri(1, 20)),
     });
   }),
-  'client/conflict-check': () => Array.from({ length: 14 }, () =>
+  'client/conflict-check': () => Array.from({ length: 5 }, () =>
     base({
       clientName: companyName(),
       opposingParty: companyName(),
@@ -892,10 +876,10 @@ const SEED_BUILDERS = {
   'client/tag': () => ['VIP客户', '战略客户', '潜在客户', '风险客户', '长期合作'].map((t, i) =>
     base({ id: 1000 + i, tagName: t, color: pick(['red', 'blue', 'green', 'orange', 'purple']) }),
   ),
-  'client/contact': () => Array.from({ length: 18 }, () =>
+  'client/contact': () => Array.from({ length: 5 }, () =>
     base({ clientId: ri(1, 42), contactName: fullName(), phone: '1' + String(ri(3000000000, 5999999999)), position: pick(POOL.position), isPrimary: bool() }),
   ),
-  'matter': () => Array.from({ length: 48 }, () => {
+  'matter': () => Array.from({ length: 5 }, () => {
     const caseType = pick(POOL.caseType);
     const caseName = caseType + '一案';
     const caseNo = '(' + ri(2023, 2026) + ')' + pick(POOL.city) + '律民初' + String(ri(100, 999)) + '号';
@@ -927,25 +911,25 @@ const SEED_BUILDERS = {
       description: '本案系' + caseType + '，涉及标的额较大，需持续跟进。',
     });
   }),
-  'matter/contract': () => Array.from({ length: 20 }, () =>
+  'matter/contract': () => Array.from({ length: 5 }, () =>
     base({ contractNo: 'MC' + String(ri(100000, 999999)), matterName: pick(POOL.caseType) + '一案', clientName: companyName(), amount: ri(5, 300) * 10000, signDate: daysAgo(ri(10, 300)), status: pick(POOL.financeStatus) }),
   ),
-  'tasks': () => Array.from({ length: 26 }, () =>
+  'tasks': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['起草答辩状', '证据整理', '客户访谈', '庭审准备', '法律检索', '合同审阅', '阅卷', '调解方案']), matterName: pick(POOL.caseType) + '一案', assignee: pick(matterOwners()), dueDate: daysAgo(-ri(1, 25)), priority: pick(['高', '中', '低']), status: pick(['待开始', '进行中', '已完成', '已逾期']) }),
   ),
-  'timesheets': () => Array.from({ length: 30 }, () =>
+  'timesheets': () => Array.from({ length: 5 }, () =>
     base({ employeeName: pick(matterOwners()), matterName: pick(POOL.caseType) + '一案', workDate: daysAgo(ri(1, 60)), hours: ri(1, 9), description: pick(['庭审', '会见', '文书', '研究', '谈判']), status: pick(['草稿', '已提交', '已审批']) }),
   ),
-  'schedules': () => Array.from({ length: 16 }, () =>
+  'schedules': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['开庭', '客户会议', '内部研讨', '尽调', '证据交换']), matterName: pick(POOL.caseType) + '一案', type: pick(['开庭', '会议', '提醒', ' deadline']), dueDate: daysAgo(-ri(1, 30)), ownerName: pick(matterOwners()), remind: bool() }),
   ),
-  'document': () => Array.from({ length: 38 }, () =>
+  'document': () => Array.from({ length: 5 }, () =>
     base({ docNo: 'WD' + String(ri(10000, 99999)), docName: pick(POOL.docType) + '（' + companyName() + '）', docType: pick(POOL.docType), matterName: pick(POOL.caseType) + '一案', ownerName: fullName(), size: ri(10, 5000) + 'KB', status: pick(POOL.docStatus) }),
   ),
-  'document/template': () => Array.from({ length: 12 }, () =>
+  'document/template': () => Array.from({ length: 5 }, () =>
     base({ templateName: pick(POOL.docType) + '模板', category: pick(['民事诉讼', '刑事诉讼', '商事', '非诉']), version: 'v' + ri(1, 5) + '.' + ri(0, 9), ownerName: fullName(), status: pick(['启用', '停用']) }),
   ),
-  'document/seal-application': () => Array.from({ length: 20 }, () => {
+  'document/seal-application': () => Array.from({ length: 5 }, () => {
     const d = daysAgo(ri(1, 90));
     return base({
       applicationNo: 'YY' + String(ri(100000, 999999)),
@@ -961,10 +945,10 @@ const SEED_BUILDERS = {
       status: pick(['待审批', '已用印', '已驳回']),
     });
   }),
-  'document/seal': () => Array.from({ length: 16 }, () =>
+  'document/seal': () => Array.from({ length: 5 }, () =>
     base({ sealName: pick(['公章', '合同专用章', '财务专用章', '发票专用章', '法人章']), applyReason: pick(['合同用印', '函件用印', '证明文件']), applicant: fullName(), applyDate: daysAgo(ri(1, 60)), status: pick(['待审批', '已用印', '已驳回']) }),
   ),
-  'archive': () => Array.from({ length: 24 }, () => {
+  'archive': () => Array.from({ length: 5 }, () => {
     const ct = pick(POOL.caseType);
     return base({
       archiveNo: 'DA' + String(ri(10000, 99999)),
@@ -984,25 +968,25 @@ const SEED_BUILDERS = {
       status: pick(['在库', '借阅中', '已销毁', '已移交']),
     });
   }),
-  'archive/access': () => Array.from({ length: 12 }, () =>
+  'archive/access': () => Array.from({ length: 5 }, () =>
     base({ archiveNo: 'DA' + String(ri(10000, 99999)), applicant: fullName(), reason: pick(['阅卷', '复印', '移交']), applyDate: daysAgo(ri(1, 40)), approveStatus: pick(['待审批', '已批准', '已驳回']) }),
   ),
-  'finance/contract': () => Array.from({ length: 30 }, () =>
+  'finance/contract': () => Array.from({ length: 5 }, () =>
     base({ contractNo: 'HT' + String(ri(100000, 999999)), contractName: pick(POOL.caseType) + '委托代理合同', clientName: companyName(), matterName: pick(POOL.caseType) + '一案', amount: ri(5, 500) * 10000, signDate: daysAgo(ri(10, 400)), status: pick(POOL.financeStatus), ownerName: fullName() }),
   ),
-  'finance/invoice': () => Array.from({ length: 24 }, () =>
+  'finance/invoice': () => Array.from({ length: 5 }, () =>
     base({ invoiceNo: 'INV' + String(ri(100000, 999999)), contractNo: 'HT' + String(ri(100000, 999999)), clientName: companyName(), amount: ri(1, 200) * 10000, taxRate: pick(['1%', '3%', '6%', '9%']), issueDate: daysAgo(ri(1, 200)), type: pick(['增值税专用发票', '增值税普通发票']), status: pick(['已开具', '已作废', '已红冲']) }),
   ),
-  'finance/fee': () => Array.from({ length: 20 }, () =>
+  'finance/fee': () => Array.from({ length: 5 }, () =>
     base({ feeNo: 'FY' + String(ri(100000, 999999)), clientName: companyName(), matterName: pick(POOL.caseType) + '一案', feeType: pick(['律师费', '诉讼费', '保全费', '鉴定费', '差旅费']), amount: ri(1, 100) * 10000, payable: ri(1, 100) * 10000, paid: ri(0, 80) * 10000, status: pick(POOL.financeStatus), dueDate: daysAgo(-ri(1, 60)) }),
   ),
-  'finance/commission': () => Array.from({ length: 18 }, () =>
+  'finance/commission': () => Array.from({ length: 5 }, () =>
     base({ commissionNo: 'TC' + String(ri(100000, 999999)), lawyerName: fullName(), matterName: pick(POOL.caseType) + '一案', amount: ri(1, 80) * 10000, rate: pick(['15%', '20%', '25%', '30%']), status: pick(['待结算', '已审批', '已发放', '已驳回']), settleDate: daysAgo(ri(1, 120)) }),
   ),
-  'finance/expense': () => Array.from({ length: 22 }, () =>
+  'finance/expense': () => Array.from({ length: 5 }, () =>
     base({ expenseNo: 'BX' + String(ri(100000, 999999)), applicantName: fullName(), category: pick(POOL.expenseCategory), amount: ri(1, 20) * 1000, status: pick(['待审批', '已通过', '已驳回', '已支付']), applyDate: daysAgo(ri(1, 90)), remark: pick(['出差报销', '客户招待', '办公采购']) }),
   ),
-  'finance/payment': () => Array.from({ length: 16 }, () =>
+  'finance/payment': () => Array.from({ length: 5 }, () =>
     base({ paymentNo: 'SK' + String(ri(100000, 999999)), clientName: companyName(), contractNo: 'HT' + String(ri(100000, 999999)), amount: ri(1, 200) * 10000, payMethod: pick(['银行转账', '支票', '汇票']), payDate: daysAgo(ri(1, 150)), status: pick(['已收款', '部分收款', '待确认']) }),
   ),
   'system/user': () => {
@@ -1010,7 +994,7 @@ const SEED_BUILDERS = {
       base({ id: u.userId, username: u.username, realName: u.realName, deptName: u.deptName, roleNames: u.roleNames.join(','), email: u.email, phone: u.phone, status: 'ENABLED' }),
     );
     return sysUsers.concat(
-      Array.from({ length: 20 }, () =>
+      Array.from({ length: 0 }, () =>
         base({ username: 'user' + ri(100, 999), realName: fullName(), deptName: pick(POOL.dept), roleNames: pick(POOL.position), email: 'u' + ri(100, 999) + '@lawfirm.demo', phone: '1' + String(ri(3000000000, 5999999999)), status: pick(['ENABLED', 'DISABLED']) }),
       ),
     );
@@ -1026,11 +1010,11 @@ const SEED_BUILDERS = {
     { id: 7, roleName: '实习律师', roleCode: 'TRAINEE', description: '实习人员，仅可查看本人数据', dataScope: 'SELF', dataScopeName: '仅本人', status: 'ACTIVE', statusName: '启用', sortOrder: 7 },
   ],
   'system/department': () => POOL.dept.map((d, i) => ({ id: i + 1, deptName: d, parentName: i === 0 ? '无' : '管委会', leader: fullName(), memberCount: ri(3, 20), status: 'ENABLED' })),
-  'system/dict': () => Array.from({ length: 16 }, (_, i) => ({ id: i + 1, dictName: pick(['案件类型', '文书类型', '费用类型', '城市', '行业', '性别', '学历', '民族']), dictCode: 'DICT_' + (i + 1), status: 'ENABLED' })),
-  'system/announcement': () => Array.from({ length: 12 }, () =>
+  'system/dict': () => Array.from({ length: 5 }, (_, i) => ({ id: i + 1, dictName: pick(['案件类型', '文书类型', '费用类型', '城市', '行业', '性别', '学历', '民族']), dictCode: 'DICT_' + (i + 1), status: 'ENABLED' })),
+  'system/announcement': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['关于', '通知', '提醒']) + pick(['元旦放假', '年度考核', '系统升级', '培训安排', '费用报销制度']), content: '这是一条演示公告内容，用于展示公告管理模块。', publisher: fullName(), publishTime: dateTimeAgo(ri(1, 60)), level: pick(POOL.announcementLevel) }),
   ),
-  'system/log': () => Array.from({ length: 30 }, () =>
+  'system/log': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), module: pick(['用户', '角色', '案件', '客户', '财务', '系统']), action: pick(['新增', '修改', '删除', '查询', '导出', '登录']), operator: fullName(), ip: '192.168.' + ri(1, 255) + '.' + ri(1, 255), operateTime: dateTimeAgo(ri(0, 60)), result: pick(['成功', '成功', '成功', '失败']) }),
   ),
   'system/config': () => [
@@ -1039,7 +1023,7 @@ const SEED_BUILDERS = {
     { id: 3, configKey: 'sys.copyright', configName: '版权信息', configValue: '© 2026 演示版', group: '基础' },
     { id: 4, configKey: 'sys.theme', configName: '默认主题', configValue: 'dark', group: '外观' },
   ],
-  'system/backup': () => Array.from({ length: 8 }, () =>
+  'system/backup': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), backupNo: 'BK' + String(ri(100000, 999999)), type: pick(['全量', '增量']), size: ri(100, 9000) + 'MB', startTime: dateTimeAgo(ri(1, 60)), status: pick(['成功', '进行中', '失败']), operator: fullName() }),
   ),
   'system/integration': () => [
@@ -1051,57 +1035,91 @@ const SEED_BUILDERS = {
     { id: 6, name: 'MinIO 对象存储', integrationName: 'MinIO 对象存储', type: 'minio', integrationType: 'OTHER', integrationCode: 'MINIO', apiUrl: 'https://minio.lawfirm.demo', authType: 'API Key', enabled: true, status: 'ENABLED', lastTestResult: '连接正常', description: '卷宗与附件存储', config: '{}' },
     { id: 7, name: 'OnlyOffice', integrationName: 'OnlyOffice', type: 'office', integrationType: 'OTHER', integrationCode: 'ONLYOFFICE', apiUrl: 'https://office.lawfirm.demo', authType: '签名认证', enabled: false, status: 'DISABLED', lastTestResult: '未启用', description: '在线文档编辑', config: '{}' },
   ],
-  'hr/employee': () => Array.from({ length: 30 }, () =>
+  'hr/employee': () => Array.from({ length: 5 }, () =>
     base({ employeeNo: 'EMP' + String(ri(1000, 9999)), realName: fullName(), deptName: pick(POOL.dept), position: pick(POOL.position), hireDate: daysAgo(ri(100, 2000)), status: pick(['在职', '试用', '离职']) }),
   ),
-  'hr/contract': () => Array.from({ length: 24 }, () =>
+  'hr/contract': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), contractType: pick(['固定期限', '无固定期限', '实习协议']), startDate: daysAgo(ri(100, 1500)), endDate: daysAgo(-ri(100, 1000)), status: pick(['生效中', '已到期', '已解除']) }),
   ),
-  'hr/attendance': () => Array.from({ length: 28 }, () =>
+  'hr/attendance': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), employeeName: fullName(), date: daysAgo(ri(1, 60)), checkIn: '0' + ri(7, 9) + ':' + String(ri(0, 59)).padStart(2, '0'), checkOut: '1' + ri(7, 9) + ':' + String(ri(0, 59)).padStart(2, '0'), status: pick(['正常', '迟到', '早退', '缺勤']) }),
   ),
-  'hr/leave': () => Array.from({ length: 18 }, () =>
+  'hr/leave': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), leaveType: pick(POOL.leaveType), startDate: daysAgo(ri(1, 60)), endDate: daysAgo(ri(1, 55)), days: ri(1, 15), status: pick(['待审批', '已批准', '已驳回']) }),
   ),
-  'hr/payroll': () => Array.from({ length: 28 }, () => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - ri(0, 3));
-    const period = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const baseSalary = ri(8, 50) * 1000;
-    const bonus = ri(0, 20) * 1000;
-    const deduction = ri(0, 5) * 1000;
-    const name = fullName();
-    return base({
-      employeeNo: 'EMP' + ri(1000, 9999),
-      employeeName: name,
-      realName: name,
-      period,
-      payrollYear: d.getFullYear(),
-      payrollMonth: d.getMonth() + 1,
-      baseSalary,
-      bonus,
-      deduction,
-      income: baseSalary + bonus,
-      grossSalary: baseSalary + bonus,
-      totalDeduction: deduction,
-      netSalary: baseSalary + bonus - deduction,
-      confirmStatus: pick(['已确认', '待确认']),
-      status: pick(['待发放', '已发放', '已确认']),
+  /* 工资表：每月一张汇总表，表内含 5 名员工的明细行。
+     汇总字段（总人数 / 应发 / 扣减 / 实发 / 已确认数）全部由明细实算，
+     避免出现"卡片写 13 人、明细只有 1 行"这类自相矛盾。 */
+  'hr/payroll': () => {
+    const now = new Date();
+    return Array.from({ length: 3 }, (_, k) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+      const period = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      const items = Array.from({ length: 5 }, () => {
+        const baseSalary = ri(8, 50) * 1000;
+        const bonus = ri(0, 20) * 1000;
+        const deduction = ri(0, 5) * 1000;
+        const name = fullName();
+        const gross = baseSalary + bonus;
+        const net = gross - deduction;
+        const confirmStatus = pick(['已确认', '待确认']);
+        return {
+          id: nextId(),
+          employeeNo: 'EMP' + ri(1000, 9999),
+          employeeName: name,
+          realName: name,
+          baseSalary,
+          bonus,
+          deduction,
+          income: gross,
+          grossSalary: gross,
+          grossAmount: gross,
+          totalGrossAmount: gross,
+          deductionAmount: deduction,
+          totalDeductionAmount: deduction,
+          netSalary: net,
+          netAmount: net,
+          totalNetAmount: net,
+          // 前端"收入"列 = incomes 数组 amount 之和（基本工资 + 绩效奖金）
+          incomes: [
+            { name: '基本工资', amount: baseSalary },
+            { name: '绩效奖金', amount: bonus },
+          ],
+          confirmStatus,
+          confirmStatusName: confirmStatus,
+        };
+      });
+      const sum = (f) => items.reduce((s, i) => s + (Number(i[f]) || 0), 0);
+      return base({
+        payrollNo: 'GZ' + period.replace('-', '') + ri(100, 999),
+        period,
+        payrollYear: d.getFullYear(),
+        payrollMonth: d.getMonth() + 1,
+        employeeCount: items.length,
+        totalEmployees: items.length,
+        confirmedCount: items.filter((i) => i.confirmStatus === '已确认').length,
+        totalBaseSalary: sum('baseSalary'),
+        totalGrossAmount: sum('grossAmount'),
+        totalDeductionAmount: sum('deductionAmount'),
+        totalNetAmount: sum('netAmount'),
+        status: pick(['待发放', '已发放', '已确认']),
+        items,
+      });
     });
-  }),
-  'hr/performance': () => Array.from({ length: 14 }, () =>
+  },
+  'hr/performance': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), period: ri(2024, 2026) + 'Q' + ri(1, 4), score: ri(60, 100), grade: pick(['S', 'A', 'B', 'C']), status: pick(['进行中', '已完成']) }),
   ),
-  'admin/asset': () => Array.from({ length: 26 }, () =>
+  'admin/asset': () => Array.from({ length: 5 }, () =>
     base({ assetNo: 'ZC' + String(ri(10000, 99999)), assetName: pick(['笔记本电脑', '台式机', '打印机', '投影仪', '办公桌椅', '车辆', '服务器']), category: pick(POOL.assetCategory), ownerName: fullName(), location: pick(POOL.city) + '办公室' + ri(1, 9), value: ri(1, 50) * 1000, purchaseDate: daysAgo(ri(100, 1500)), status: pick(['在用', '闲置', '维修中', '已报废']) }),
   ),
-  'admin/meeting-room': () => Array.from({ length: 8 }, () =>
+  'admin/meeting-room': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), roomName: pick(POOL.city) + '会议室' + ri(1, 9), location: ri(1, 9) + '楼', capacity: ri(4, 30), facility: pick(['投影', '视频会议', '白板', '音响']), status: pick(['可用', '占用', '维护中']) }),
   ),
-  'admin/letter': () => Array.from({ length: 12 }, () =>
+  'admin/letter': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['介绍信', '公函', '调查函']), applicant: fullName(), purpose: pick(['立案', '调查取证', '查询档案']), applyDate: daysAgo(ri(1, 50)), status: pick(['待审批', '已开具', '已作废']) }),
   ),
-  'admin/purchase': () => Array.from({ length: 14 }, () => {
+  'admin/purchase': () => Array.from({ length: 5 }, () => {
     const amt = ri(1, 50) * 1000;
     const purpose = pick(['办公用品', '软件授权', '电子设备', '耗材']);
     const st = pick(['PENDING', 'APPROVED', 'REJECTED', 'PURCHASED']);
@@ -1111,49 +1129,49 @@ const SEED_BUILDERS = {
       status: st, statusName: ({ PENDING: '待审批', APPROVED: '已批准', REJECTED: '已驳回', PURCHASED: '已采购' })[st],
     });
   }),
-  'admin/supplier': () => Array.from({ length: 10 }, () =>
+  'admin/supplier': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), supplierName: companyName(), category: pick(['办公用品', 'IT服务', '印刷', '餐饮']), contactName: fullName(), contactPhone: '1' + String(ri(3000000000, 5999999999)), status: pick(['合作中', '待评估', '已终止']) }),
   ),
-  'knowledge/article': () => Array.from({ length: 20 }, () => {
+  'knowledge/article': () => Array.from({ length: 5 }, () => {
     const cat = pick(POOL.knowledgeCategory);
     const author = fullName();
     const status = pick(['草稿', '已发布', '已下线']);
     return base({ title: cat + '：' + pick(POOL.caseType) + '实务要点', author, authorName: author, category: cat, categoryName: cat, tags: pick(POOL.knowledgeCategory), views: ri(10, 2000), likes: ri(0, 300), publishTime: daysAgo(ri(1, 300)), status, statusName: status });
   }),
-  'knowledge/law': () => Array.from({ length: 18 }, () => {
+  'knowledge/law': () => Array.from({ length: 5 }, () => {
     const title = pick(['民法典', '民事诉讼法', '公司法', '刑法', '行政处罚法']) + '相关条款解读';
     const cat = pick(['法律', '司法解释', '行政法规']);
     const issuer = pick(['全国人大', '最高法院', '司法部']);
     const status = pick(['生效', '征求意见稿']);
     return base({ title, name: title, category: cat, categoryName: cat, lawTypeName: cat, source: issuer, issuer, issueDate: daysAgo(ri(100, 2000)), effectiveDate: daysAgo(ri(100, 2000)), status, statusName: status });
   }),
-  'knowledge/case': () => Array.from({ length: 16 }, () =>
+  'knowledge/case': () => Array.from({ length: 5 }, () =>
     base({ title: pick(POOL.caseType) + '典型案例评析', caseNo: '(' + ri(2020, 2025) + ')最高法民再' + ri(1, 999) + '号', courtName: pick(POOL.court), tags: pick(POOL.caseType), status: pick(['已发布', '草稿']) }),
   ),
-  'workbench/approval': () => Array.from({ length: 22 }, () =>
+  'workbench/approval': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['用印申请', '报销申请', '请假申请', '采购申请', '结案申请']), type: pick(['用印', '报销', '请假', '采购', '结案']), applicant: fullName(), amount: ri(1, 50) * 1000, status: pick(['待审批', '已通过', '已驳回', '已撤销']), applyTime: dateTimeAgo(ri(0, 40)), currentNode: pick(['部门负责人', '财务', '主任', '已完成']) }),
   ),
-  'workbench/report': () => Array.from({ length: 14 }, () =>
+  'workbench/report': () => Array.from({ length: 5 }, () =>
     base({ title: pick(POOL.caseType) + '阶段报告', matterName: pick(POOL.caseType) + '一案', author: fullName(), period: ri(2024, 2026) + '-' + String(ri(1, 12)).padStart(2, '0'), status: pick(['草稿', '已提交', '已审批']) }),
   ),
-  'workbench/report-template': () => Array.from({ length: 8 }, () =>
+  'workbench/report-template': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), templateName: pick(POOL.caseType) + '报告模板', category: pick(['诉讼', '非诉', '顾问']), status: pick(['启用', '停用']) }),
   ),
-  'workbench/scheduled-report': () => Array.from({ length: 6 }, () =>
+  'workbench/scheduled-report': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), name: pick(['周报', '月报', '季报']) + '自动推送', cron: '0 9 * * 1', receivers: fullName(), status: pick(['启用', '停用']) }),
   ),
-  'evidence': () => Array.from({ length: 20 }, () =>
+  'evidence': () => Array.from({ length: 5 }, () =>
     base({ evidenceNo: 'EVD' + String(ri(10000, 99999)), matterName: pick(POOL.caseType) + '一案', name: pick(['合同原件', '转账记录', '聊天记录', '鉴定意见', '现场勘验']), type: pick(['书证', '物证', '电子证据', '鉴定意见']), status: pick(['已采集', '待整理', '已归档']), collectDate: daysAgo(ri(1, 200)), holder: fullName() }),
   ),
-  'ai/pricing': () => Array.from({ length: 8 }, () =>
+  'ai/pricing': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), modelName: pick(['GPT-4o', 'Claude', '通义千问', '文心一言', '智谱GLM']), unit: pick(['千tokens', '次']), price: (ri(1, 100) / 10).toFixed(2), status: pick(['启用', '停用']), effectiveDate: daysAgo(ri(1, 200)) }),
   ),
-  'ai/usage': () => Array.from({ length: 24 }, () =>
+  'ai/usage': () => Array.from({ length: 5 }, () =>
     ({ id: nextId(), userName: fullName(), model: pick(['GPT-4o', 'Claude', '通义千问']), tokens: ri(1000, 500000), cost: (ri(1, 500) / 10).toFixed(2), date: daysAgo(ri(1, 60)) }),
   ),
   'admin/meeting-record': () => {
     const rooms = getCol('admin/meeting-room');
-    return Array.from({ length: 12 }, () =>
+    return Array.from({ length: 5 }, () =>
       base({
         recordNo: 'HY' + String(ri(10000, 99999)),
         roomId: pick(rooms).id,
@@ -1169,76 +1187,76 @@ const SEED_BUILDERS = {
   },
 
   /* —— 行政：考勤 / 请假 / 加班 / 外出 / 资产盘点 / 行政合同 / 操作日志 —— */
-  'admin/attendance': () => Array.from({ length: 20 }, () =>
+  'admin/attendance': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), attendanceDate: daysAgo(ri(0, 30)), checkIn: String(ri(8, 10)).padStart(2, '0') + ':' + String(ri(0, 59)).padStart(2, '0'), checkOut: String(ri(17, 20)).padStart(2, '0') + ':' + String(ri(0, 59)).padStart(2, '0'), attendanceStatus: pick(['正常', '迟到', '早退', '缺勤', '请假', '出差']), workHours: ri(6, 10) }),
   ),
-  'admin/leave': () => Array.from({ length: 12 }, () =>
+  'admin/leave': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), leaveType: pick(POOL.leaveType), startDate: daysAgo(ri(1, 40)), endDate: daysAgo(ri(0, 30)), days: ri(1, 7), reason: pick(['家中有事', '身体不适', '年休假安排', '婚假', '陪产假']), approverName: fullName(), applyTime: dateTimeAgo(ri(1, 40)), status: pick(['待审批', '已通过', '已驳回', '已撤销']) }),
   ),
-  'admin/overtime': () => Array.from({ length: 12 }, () =>
+  'admin/overtime': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), overtimeDate: daysAgo(ri(0, 40)), startTime: '18:30', endTime: String(ri(20, 23)).padStart(2, '0') + ':00', hours: ri(1, 6), reason: pick(['开庭材料准备', '合同审核', '客户紧急需求', '项目交付']), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'admin/go-out': () => Array.from({ length: 12 }, () =>
+  'admin/go-out': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), goOutDate: daysAgo(ri(0, 30)), startTime: '09:00', endTime: '17:00', destination: pick(POOL.city) + pick(['中级人民法院', '客户公司', '市场监督管理局', '不动产登记中心']), reason: pick(['开庭', '客户拜访', '调取档案', '办理立案']), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'admin/asset-inventory': () => Array.from({ length: 10 }, () =>
+  'admin/asset-inventory': () => Array.from({ length: 5 }, () =>
     base({ inventoryNo: 'PD' + String(ri(10000, 99999)), inventoryDate: daysAgo(ri(1, 90)), inventoryName: pick(['季度资产盘点', '年度资产盘点', '专项抽查']), operatorName: fullName(), totalCount: ri(20, 200), checkedCount: ri(10, 200), diffCount: ri(0, 5), status: pick(['进行中', '已完成', '已作废']) }),
   ),
-  'admin/contract': () => Array.from({ length: 12 }, () =>
+  'admin/contract': () => Array.from({ length: 5 }, () =>
     base({ contractNo: 'XZ' + String(ri(10000, 99999)), contractName: pick(['办公场地租赁', '物业服务', '设备采购', '软件服务', '车辆保险']) + '合同', partyName: companyName(), amount: ri(1, 200) * 10000, signDate: daysAgo(ri(1, 300)), endDate: daysAgo(-ri(30, 500)), operatorName: fullName(), status: pick(['履行中', '已到期', '已终止', '草稿']) }),
   ),
-  'admin/operation-log': () => Array.from({ length: 30 }, () =>
+  'admin/operation-log': () => Array.from({ length: 5 }, () =>
     base({ operatorName: fullName(), module: pick(['系统管理', '客户管理', '项目管理', '财务管理', '人力资源', '行政管理']), operation: pick(['新增', '修改', '删除', '查询', '导出', '登录']), target: pick(['用户信息', '客户档案', '案件信息', '合同', '发票', '公告']), ip: '192.168.' + ri(1, 50) + '.' + ri(1, 254), result: pick(['成功', '成功', '成功', '失败']), costMs: ri(10, 900) }),
   ),
 
   /* —— 人力资源：晋升 / 发展计划 / 转正 / 离职 / 培训通知 —— */
-  'hr/promotion': () => Array.from({ length: 12 }, () =>
+  'hr/promotion': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), currentLevel: pick(POOL.position), targetLevel: pick(POOL.position), applyDate: daysAgo(ri(1, 120)), reason: '工作表现突出，承办案件数量与质量均达到晋升标准。', approverName: fullName(), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'hr/development-plan': () => Array.from({ length: 10 }, () =>
+  'hr/development-plan': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), planName: pick(['年度能力提升计划', '青年律师培养计划', '专业方向深耕计划']), period: ri(2024, 2026) + '年度', goal: '提升独立办案能力与专业领域影响力。', mentorName: fullName(), progress: ri(0, 100), status: pick(['进行中', '已完成', '已延期']) }),
   ),
-  'hr/regularization': () => Array.from({ length: 10 }, () =>
+  'hr/regularization': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), entryDate: daysAgo(ri(90, 400)), probationEnd: daysAgo(-ri(1, 60)), evaluatorName: fullName(), score: ri(60, 98), conclusion: pick(['同意转正', '延长试用期', '不予录用']), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'hr/resignation': () => Array.from({ length: 10 }, () =>
+  'hr/resignation': () => Array.from({ length: 5 }, () =>
     base({ employeeName: fullName(), deptName: pick(POOL.dept), resignType: pick(['个人原因', '家庭原因', '职业发展', '身体原因']), applyDate: daysAgo(ri(1, 200)), lastWorkDate: daysAgo(-ri(1, 60)), handoverName: fullName(), reason: '因个人职业规划调整提出离职申请。', status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'hr/training-notice': () => Array.from({ length: 12 }, () =>
+  'hr/training-notice': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['民法典实务培训', '诉讼技巧研讨', '合规与风控', '青年律师训练营', '客户沟通技巧']), trainingType: pick(['内部培训', '外部培训', '线上课程']), trainerName: fullName(), startDate: daysAgo(-ri(1, 90)), location: pick(['大会议室', '培训室', '线上']), attendeeCount: ri(10, 80), status: pick(['报名中', '进行中', '已结束', '已取消']) }),
   ),
 
   /* —— 财务：付款变更 / 合同变更 / 预收款 —— */
-  'finance/payment-amendment': () => Array.from({ length: 10 }, () =>
+  'finance/payment-amendment': () => Array.from({ length: 5 }, () =>
     base({ amendmentNo: 'BG' + String(ri(10000, 99999)), contractNo: 'HT' + String(ri(100000, 999999)), clientName: companyName(), originalAmount: ri(10, 500) * 10000, amendedAmount: ri(10, 500) * 10000, reason: pick(['服务范围调整', '周期延长', '税率变动', '双方协商']), applicantName: fullName(), applyDate: daysAgo(ri(1, 90)), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'finance/contract-amendment': () => Array.from({ length: 10 }, () =>
+  'finance/contract-amendment': () => Array.from({ length: 5 }, () =>
     base({ amendmentNo: 'HTBG' + String(ri(10000, 99999)), contractNo: 'HT' + String(ri(100000, 999999)), clientName: companyName(), amendmentType: pick(['金额变更', '期限变更', '主体变更', '条款变更']), beforeValue: String(ri(10, 500) * 10000), afterValue: String(ri(10, 500) * 10000), reason: '因项目实际情况变化，双方协商一致变更。', applicantName: fullName(), applyDate: daysAgo(ri(1, 90)), status: pick(['待审批', '已通过', '已驳回']) }),
   ),
-  'finance/prepayment': () => Array.from({ length: 12 }, () =>
+  'finance/prepayment': () => Array.from({ length: 5 }, () =>
     base({ prepayNo: 'YF' + String(ri(10000, 99999)), clientName: companyName(), matterName: pick(POOL.caseType) + '一案', amount: ri(1, 100) * 10000, usedAmount: ri(0, 50) * 10000, balance: ri(0, 50) * 10000, payDate: daysAgo(ri(1, 200)), ownerName: fullName(), status: pick(['待使用', '部分使用', '已用完', '已退款']) }),
   ),
 
   /* —— 系统 / 卷宗模板 / 知识库质量与风险 —— */
-  'system/data-handover': () => Array.from({ length: 10 }, () =>
+  'system/data-handover': () => Array.from({ length: 5 }, () =>
     base({ handoverNo: 'JJ' + String(ri(10000, 99999)), fromUserName: fullName(), toUserName: fullName(), handoverType: pick(['离职交接', '岗位调整', '项目交接']), matterCount: ri(1, 30), documentCount: ri(1, 100), handoverDate: daysAgo(ri(1, 120)), status: pick(['待交接', '交接中', '已完成']) }),
   ),
-  'system/contract-template': () => Array.from({ length: 8 }, () =>
+  'system/contract-template': () => Array.from({ length: 5 }, () =>
     base({ templateName: pick(['常年法律顾问合同', '民事诉讼委托代理合同', '刑事辩护委托协议', '非诉专项服务合同', '风险代理协议']), templateCode: 'TPL' + ri(100, 999), category: pick(['诉讼', '非诉', '顾问', '仲裁']), version: 'V' + ri(1, 5) + '.0', ownerName: fullName(), status: pick(['启用', '停用']) }),
   ),
-  'system/notification': () => Array.from({ length: 12 }, () =>
+  'system/notification': () => Array.from({ length: 5 }, () =>
     base({ title: pick(['审批待办提醒', '案件期限提醒', '合同到期提醒', '系统维护通知', '月度报表已生成']), content: '您有新的待办事项，请及时处理。', receiverName: fullName(), notifyType: pick(['系统', '邮件', '短信', '企业微信']), readFlag: bool(), sendTime: dateTimeAgo(ri(1, 30)), status: pick(['已读', '未读']) }),
   ),
-  'dossier/template': () => Array.from({ length: 6 }, () =>
+  'dossier/template': () => Array.from({ length: 5 }, () =>
     base({ templateName: pick(['诉讼卷宗模板', '非诉卷宗模板', '执行案件卷宗模板', '仲裁案件卷宗模板']), category: pick(['诉讼', '非诉', '执行', '仲裁']), itemCount: ri(8, 30), ownerName: fullName(), status: pick(['启用', '停用']) }),
   ),
-  'knowledge/quality-check': () => Array.from({ length: 10 }, () =>
+  'knowledge/quality-check': () => Array.from({ length: 5 }, () =>
     base({ checkNo: 'ZL' + String(ri(10000, 99999)), targetType: pick(['文书', '卷宗', '合同', '案件流程']), targetName: pick(POOL.docType), checkerName: fullName(), checkDate: daysAgo(ri(1, 60)), score: ri(60, 100), issueCount: ri(0, 5), status: pick(['进行中', '已完成', '待整改']) }),
   ),
-  'knowledge/quality-issue': () => Array.from({ length: 10 }, () =>
+  'knowledge/quality-issue': () => Array.from({ length: 5 }, () =>
     base({ issueNo: 'WT' + String(ri(10000, 99999)), targetType: pick(['文书', '卷宗', '合同']), targetName: pick(POOL.docType), description: pick(['格式不符合规范', '缺少必要附件', '事实表述有误', '法律依据引用不准确']), severity: pick(['一般', '较重', '严重']), reporterName: fullName(), ownerName: fullName(), status: pick(['待处理', '处理中', '已关闭']) }),
   ),
-  'knowledge/risk-warning': () => Array.from({ length: 10 }, () =>
+  'knowledge/risk-warning': () => Array.from({ length: 5 }, () =>
     base({ warningNo: 'FJ' + String(ri(10000, 99999)), riskType: pick(['期限风险', '合规风险', '利益冲突', '费用风险', '舆情风险']), matterName: pick(POOL.caseType) + '一案', level: pick(['低', '中', '高']), description: '系统检测到潜在风险，请关注并及时处理。', ownerName: fullName(), status: pick(['生效', '已解除', '已忽略']) }),
   ),
 };
@@ -2157,7 +2175,6 @@ async function routeApi(method, apiPath, params, body, req) {
     '/finance/my/expenses': 'finance/expense',
     '/finance/my/payments': 'finance/payment',
     '/finance/my/commissions': 'finance/commission',
-    '/hr/payroll/my': 'hr/payroll',
     '/admin/assets/my': 'admin/asset',
     '/admin/purchases/my': 'admin/purchase',
     '/admin/go-out/my': 'admin/go-out',
@@ -2173,24 +2190,32 @@ async function routeApi(method, apiPath, params, body, req) {
     return (db[ARRAY_ENDPOINTS[apiPath]] || []).slice(0, 12);
   }
   if (apiPath === '/hr/payroll/items') {
+    // 明细行挂在对应月份工资表的 items 上；兼容按 payrollId 或按 year+month 查询
+    const all = db['hr/payroll'] || [];
+    const bid = Number(params.get('payrollId') || params.get('id') || 0);
     const year = params.get('year');
     const month = Number(params.get('month') || 0);
-    const prefix = year && month ? `${year}-${String(month).padStart(2, '0')}` : '';
-    let list = (db['hr/payroll'] || []).filter((r) => !prefix || String(r.period || '').startsWith(prefix));
-    if (list.length === 0) list = (db['hr/payroll'] || []).slice(0, 12);
-    // 明细行字段名与工资表批次不同（grossAmount / netAmount / confirmStatusName ...）
-    return list.map((r) => ({
-      ...r,
-      income: r.income,
-      grossAmount: r.grossSalary,
-      totalGrossAmount: r.grossSalary,
-      deductionAmount: r.deduction,
-      totalDeductionAmount: r.totalDeduction,
-      netAmount: r.netSalary,
-      totalNetAmount: r.netSalary,
-      employeeName: r.employeeName,
-      confirmStatusName: r.confirmStatusName,
-      confirmStatus: r.confirmStatus,
+    let batch = bid ? all.find((b) => Number(b.id) === bid) : null;
+    if (!batch && year && month) {
+      batch = all.find((b) => String(b.period || '').startsWith(`${year}-${String(month).padStart(2, '0')}`));
+    }
+    if (!batch) batch = all[0];
+    return (batch && batch.items) || [];
+  }
+  if (apiPath === '/hr/payroll/my') {
+    // "我的工资"：按批次返回（前端列取 record.items[0] 显示个人金额），
+    // 把每人姓名称一为同一人，呈现"同一人跨月工资"
+    const batches = db['hr/payroll'] || [];
+    const meName = ((batches[0] && batches[0].items && batches[0].items[0]) || {}).employeeName || '张伟';
+    const year = params.get('year');
+    const month = Number(params.get('month') || 0);
+    let list = batches;
+    if (year && month) {
+      list = batches.filter((b) => String(b.period || '').startsWith(`${year}-${String(month).padStart(2, '0')}`));
+    }
+    return list.map((b) => ({
+      ...b,
+      items: (b.items || []).map((it) => ({ ...it, employeeName: meName, realName: meName })),
     }));
   }
 
