@@ -98,9 +98,8 @@ const nextId = () => _seq++;
  * 这里做一层别名补全 + 少量生成字段，使所有列表页面都能渲染出饱满的演示数据。
  * 仅在校验目标字段为空时回填，绝不覆盖已有值。
  * ------------------------------------------------------------------------- */
-function enrich(db) {
-  const syn = {
-    statusName: ['statusName', 'status', 'statusText'],
+const SYN = {
+  statusName: ['statusName', 'status', 'statusText'],
     totalAmount: ['totalAmount', 'amount', 'contractAmount', 'feeAmount'],
     contractAmount: ['contractAmount', 'amount', 'totalAmount'],
     paidAmount: ['paidAmount', 'receivedAmount', 'collectedAmount'],
@@ -138,87 +137,87 @@ function enrich(db) {
     categoryName: ['categoryName', 'category'],
     sourceName: ['sourceName', 'source'],
     levelName: ['levelName', 'level'],
-  };
-  for (const key of Object.keys(db)) {
-    const arr = db[key];
-    if (!Array.isArray(arr)) continue;
-    arr.forEach((rec) => {
-      if (!rec || typeof rec !== 'object') return;
-      for (const [t, srcs] of Object.entries(syn)) {
-        if (rec[t] === undefined || rec[t] === null || rec[t] === '') {
-          for (const s of srcs) {
-            if (rec[s] !== undefined && rec[s] !== null && rec[s] !== '') { rec[t] = rec[s]; break; }
-          }
+};
+
+/* 只对单个集合做字段归一化（懒加载：集合被首次构建时调用一次） */
+function enrichCollection(key, arr) {
+  if (!Array.isArray(arr)) return arr;
+  arr.forEach((rec) => {
+    if (!rec || typeof rec !== 'object') return;
+    for (const [t, srcs] of Object.entries(SYN)) {
+      if (rec[t] === undefined || rec[t] === null || rec[t] === '') {
+        for (const s of srcs) {
+          if (rec[s] !== undefined && rec[s] !== null && rec[s] !== '') { rec[t] = rec[s]; break; }
         }
       }
-      switch (key) {
-        case 'crm/conflict-check':
-          if (rec.checkNo === undefined) rec.checkNo = 'LC' + String(ri(10000, 99999));
-          if (rec.matterName === undefined) rec.matterName = pick(POOL.caseType) + '一案';
-          if (rec.checkTypeName === undefined) rec.checkTypeName = pick(['新客户', '存量客户', '关联案件', '利害关系']);
-          if (rec.statusName === undefined) rec.statusName = rec.status;
-          if (rec.applicantName === undefined) rec.applicantName = rec.reviewer || fullName();
-          if (rec.applyTime === undefined) rec.applyTime = rec.createTime;
-          break;
-        case 'timesheets':
-          if (rec.userName === undefined) rec.userName = rec.employeeName;
-          if (rec.workType === undefined) rec.workType = pick(['诉讼', '非诉', '顾问', '法律研究', '商务谈判']);
-          if (rec.workContent === undefined) rec.workContent = rec.description;
-          if (rec.billable === undefined) rec.billable = bool();
-          break;
-        case 'document/template':
-          if (rec.name === undefined) rec.name = rec.templateName;
-          if (rec.templateType === undefined) rec.templateType = rec.category;
-          if (rec.caseTypeName === undefined) rec.caseTypeName = pick(POOL.caseType);
-          if (rec.creatorName === undefined) rec.creatorName = rec.ownerName;
-          if (rec.useCount === undefined) rec.useCount = ri(0, 300);
-          break;
-        case 'admin/meeting-room':
-          if (rec.title === undefined) rec.title = pick(['周例会', '客户洽谈', '案件研讨', '尽职调查', '内部培训']);
-          if (rec.userName === undefined) rec.userName = fullName();
-          if (rec.startTime === undefined) rec.startTime = daysAgo(-ri(1, 10)) + ' ' + String(ri(9, 17)).padStart(2, '0') + ':00';
-          if (rec.endTime === undefined) rec.endTime = daysAgo(-ri(1, 10)) + ' ' + String(ri(18, 21)).padStart(2, '0') + ':00';
-          if (rec.equipment === undefined) rec.equipment = rec.facility;
-          if (rec.name === undefined) rec.name = rec.roomName;
-          break;
-        case 'hr/employee':
-          if (rec.username === undefined) rec.username = 'emp' + rec.employeeNo;
-          if (rec.departmentName === undefined) rec.departmentName = rec.deptName;
-          if (rec.phone === undefined) rec.phone = '1' + String(ri(3000000000, 5999999999));
-          if (rec.email === undefined) rec.email = 'e' + ri(100, 999) + '@lawfirm.demo';
-          if (rec.joinDate === undefined) rec.joinDate = rec.hireDate;
-          if (rec.position === undefined) rec.position = pick(POOL.position);
-          break;
-        case 'workbench/approval':
-          if (rec.approvalNo === undefined) rec.approvalNo = 'SP' + String(ri(100000, 999999));
-          if (rec.businessTypeName === undefined) rec.businessTypeName = rec.type;
-          if (rec.businessTitle === undefined) rec.businessTitle = rec.title;
-          if (rec.applicantName === undefined) rec.applicantName = rec.applicant;
-          if (rec.priority === undefined) rec.priority = pick(['高', '中', '低']);
-          if (rec.urgency === undefined) rec.urgency = pick(['紧急', '普通', '较低']);
-          if (rec.createdAt === undefined) rec.createdAt = rec.applyTime;
-          break;
-        case 'system/user':
-          if (rec.departmentName === undefined) rec.departmentName = rec.deptName;
-          if (rec.position === undefined) rec.position = rec.roleNames;
-          if (rec.phone === undefined) rec.phone = '1' + String(ri(3000000000, 5999999999));
-          if (rec.email === undefined) rec.email = 'u' + ri(100, 999) + '@lawfirm.demo';
-          break;
-        case 'finance/contract':
-          if (rec.name === undefined) rec.name = rec.contractName;
-          if (rec.contractTypeName === undefined) rec.contractTypeName = pick(['委托代理', '风险代理', '法律顾问', '专项服务']) + '合同';
-          if (rec.totalAmount === undefined) rec.totalAmount = rec.amount;
-          if (rec.paidAmount === undefined) rec.paidAmount = Math.round((rec.totalAmount || 0) * (0.3 + RND() * 0.7));
-          if (rec.statusName === undefined) rec.statusName = rec.status;
-          break;
-      }
-    });
-  }
-  return db;
+    }
+    switch (key) {
+      case 'crm/conflict-check':
+        if (rec.checkNo === undefined) rec.checkNo = 'LC' + String(ri(10000, 99999));
+        if (rec.matterName === undefined) rec.matterName = pick(POOL.caseType) + '一案';
+        if (rec.checkTypeName === undefined) rec.checkTypeName = pick(['新客户', '存量客户', '关联案件', '利害关系']);
+        if (rec.statusName === undefined) rec.statusName = rec.status;
+        if (rec.applicantName === undefined) rec.applicantName = rec.reviewer || fullName();
+        if (rec.applyTime === undefined) rec.applyTime = rec.createTime;
+        break;
+      case 'timesheets':
+        if (rec.userName === undefined) rec.userName = rec.employeeName;
+        if (rec.workType === undefined) rec.workType = pick(['诉讼', '非诉', '顾问', '法律研究', '商务谈判']);
+        if (rec.workContent === undefined) rec.workContent = rec.description;
+        if (rec.billable === undefined) rec.billable = bool();
+        break;
+      case 'document/template':
+        if (rec.name === undefined) rec.name = rec.templateName;
+        if (rec.templateType === undefined) rec.templateType = rec.category;
+        if (rec.caseTypeName === undefined) rec.caseTypeName = pick(POOL.caseType);
+        if (rec.creatorName === undefined) rec.creatorName = rec.ownerName;
+        if (rec.useCount === undefined) rec.useCount = ri(0, 300);
+        break;
+      case 'admin/meeting-room':
+        if (rec.title === undefined) rec.title = pick(['周例会', '客户洽谈', '案件研讨', '尽职调查', '内部培训']);
+        if (rec.userName === undefined) rec.userName = fullName();
+        if (rec.startTime === undefined) rec.startTime = daysAgo(-ri(1, 10)) + ' ' + String(ri(9, 17)).padStart(2, '0') + ':00';
+        if (rec.endTime === undefined) rec.endTime = daysAgo(-ri(1, 10)) + ' ' + String(ri(18, 21)).padStart(2, '0') + ':00';
+        if (rec.equipment === undefined) rec.equipment = rec.facility;
+        if (rec.name === undefined) rec.name = rec.roomName;
+        break;
+      case 'hr/employee':
+        if (rec.username === undefined) rec.username = 'emp' + rec.employeeNo;
+        if (rec.departmentName === undefined) rec.departmentName = rec.deptName;
+        if (rec.phone === undefined) rec.phone = '1' + String(ri(3000000000, 5999999999));
+        if (rec.email === undefined) rec.email = 'e' + ri(100, 999) + '@lawfirm.demo';
+        if (rec.joinDate === undefined) rec.joinDate = rec.hireDate;
+        if (rec.position === undefined) rec.position = pick(POOL.position);
+        break;
+      case 'workbench/approval':
+        if (rec.approvalNo === undefined) rec.approvalNo = 'SP' + String(ri(100000, 999999));
+        if (rec.businessTypeName === undefined) rec.businessTypeName = rec.type;
+        if (rec.businessTitle === undefined) rec.businessTitle = rec.title;
+        if (rec.applicantName === undefined) rec.applicantName = rec.applicant;
+        if (rec.priority === undefined) rec.priority = pick(['高', '中', '低']);
+        if (rec.urgency === undefined) rec.urgency = pick(['紧急', '普通', '较低']);
+        if (rec.createdAt === undefined) rec.createdAt = rec.applyTime;
+        break;
+      case 'system/user':
+        if (rec.departmentName === undefined) rec.departmentName = rec.deptName;
+        if (rec.position === undefined) rec.position = rec.roleNames;
+        if (rec.phone === undefined) rec.phone = '1' + String(ri(3000000000, 5999999999));
+        if (rec.email === undefined) rec.email = 'u' + ri(100, 999) + '@lawfirm.demo';
+        break;
+      case 'finance/contract':
+        if (rec.name === undefined) rec.name = rec.contractName;
+        if (rec.contractTypeName === undefined) rec.contractTypeName = pick(['委托代理', '风险代理', '法律顾问', '专项服务']) + '合同';
+        if (rec.totalAmount === undefined) rec.totalAmount = rec.amount;
+        if (rec.paidAmount === undefined) rec.paidAmount = Math.round((rec.totalAmount || 0) * (0.3 + RND() * 0.7));
+        if (rec.statusName === undefined) rec.statusName = rec.status;
+        break;
+    }
+  });
+  return arr;
 }
 
 /* ---------------------------------------------------------------------------
- * 演示账号（与 lawfirm 种子账号一致）
+ * 演示账号（与生产库种子账号一致）
  * ------------------------------------------------------------------------- */
 const DEMO_USERS = {
   admin: { userId: 1, username: 'admin', realName: '系统管理员', roles: ['admin', 'director'], roleNames: ['超级管理员', '主任'], permissions: ['*'], deptName: '管委会', position: '主任', email: 'admin@lawfirm.demo', phone: '13800000001' },
@@ -417,9 +416,15 @@ function buildMenu(username) {
 /* ---------------------------------------------------------------------------
  * 种子数据生成
  * ------------------------------------------------------------------------- */
-function buildSeed() {
-  const db = {};
-  const base = (extra) => {
+/* ---------------------------------------------------------------------------
+ * 种子数据生成 —— 按集合懒加载
+ *
+ * 系统页面极多，若一次性构建全部集合会造成明显的加载卡顿。这里把每个集合
+ * 拆成独立 builder，只在某个集合被首次访问时才生成并 enrich，未访问的集合
+ * 完全不消耗时间。集合间的共享数据（如案件负责人姓名池）用懒初始化单例保持。
+ * ------------------------------------------------------------------------- */
+/* 记录基础字段：每条种子记录的公共字段 */
+const base = (extra) => {
     const createTime = dateTimeAgo(ri(1, 200));
     const updateTime = dateTimeAgo(ri(0, 30));
     return {
@@ -433,10 +438,17 @@ function buildSeed() {
       remark: '',
       ...extra,
     };
-  };
+};
 
-  // 客户
-  db['client'] = Array.from({ length: 42 }, () => {
+/* 案件相关人员姓名池：懒初始化单例，供案件/任务/工时/日程共用，保证跨集合负责人一致 */
+let _matterOwners = null;
+function matterOwners() {
+  if (!_matterOwners) _matterOwners = Array.from({ length: 8 }, () => fullName());
+  return _matterOwners;
+}
+
+const SEED_BUILDERS = {
+  'client': () => Array.from({ length: 42 }, () => {
     const cname = companyName();
     const ctype = pick(['企业', '个人']);
     const owner = fullName();
@@ -460,9 +472,8 @@ function buildSeed() {
       ownerName: owner,
       responsibleLawyerName: owner,
     });
-  });
-  // 案源
-  db['client/lead'] = Array.from({ length: 22 }, () => {
+  }),
+  'client/lead': () => Array.from({ length: 22 }, () => {
     const source = pick(['官网', '转介绍', '市场活动', '电话咨询']);
     const status = pick(['待跟进', '跟进中', '已转化', '已流失']);
     const follow = fullName();
@@ -482,9 +493,8 @@ function buildSeed() {
       ownerName: follow,
       nextFollowTime: daysAgo(-ri(1, 20)),
     });
-  });
-  // 利冲审查
-  db['client/conflict-check'] = Array.from({ length: 14 }, () =>
+  }),
+  'client/conflict-check': () => Array.from({ length: 14 }, () =>
     base({
       clientName: companyName(),
       opposingParty: companyName(),
@@ -493,23 +503,19 @@ function buildSeed() {
       status: pick(['待审查', '已通过', '已豁免', '存在冲突']),
       reviewer: fullName(),
     }),
-  );
-  // 客户子资源（少量，演示用）
-  db['client/tag'] = ['VIP客户', '战略客户', '潜在客户', '风险客户', '长期合作'].map((t, i) =>
+  ),
+  'client/tag': () => ['VIP客户', '战略客户', '潜在客户', '风险客户', '长期合作'].map((t, i) =>
     base({ id: 1000 + i, tagName: t, color: pick(['red', 'blue', 'green', 'orange', 'purple']) }),
-  );
-  db['client/contact'] = Array.from({ length: 18 }, () =>
+  ),
+  'client/contact': () => Array.from({ length: 18 }, () =>
     base({ clientId: ri(1, 42), contactName: fullName(), phone: '1' + String(ri(3000000000, 5999999999)), position: pick(POOL.position), isPrimary: bool() }),
-  );
-
-  // 案件
-  const matterOwners = Array.from({ length: 8 }, () => fullName());
-  db['matter'] = Array.from({ length: 48 }, () => {
+  ),
+  'matter': () => Array.from({ length: 48 }, () => {
     const caseType = pick(POOL.caseType);
     const caseName = caseType + '一案';
     const caseNo = '(' + ri(2023, 2026) + ')' + pick(POOL.city) + '律民初' + String(ri(100, 999)) + '号';
     const mtype = pick(['诉讼', '非诉', '顾问', '仲裁']);
-    const lead = pick(matterOwners);
+    const lead = pick(matterOwners());
     const amount = ri(10, 2000) * 10000;
     const status = pick(POOL.matterStatus);
     return base({
@@ -535,33 +541,29 @@ function buildSeed() {
       progress: ri(0, 100),
       description: '本案系' + caseType + '，涉及标的额较大，需持续跟进。',
     });
-  });
-  db['matter/contract'] = Array.from({ length: 20 }, () =>
+  }),
+  'matter/contract': () => Array.from({ length: 20 }, () =>
     base({ contractNo: 'MC' + String(ri(100000, 999999)), matterName: pick(POOL.caseType) + '一案', clientName: companyName(), amount: ri(5, 300) * 10000, signDate: daysAgo(ri(10, 300)), status: pick(POOL.financeStatus) }),
-  );
-  db['tasks'] = Array.from({ length: 26 }, () =>
-    base({ title: pick(['起草答辩状', '证据整理', '客户访谈', '庭审准备', '法律检索', '合同审阅', '阅卷', '调解方案']), matterName: pick(POOL.caseType) + '一案', assignee: pick(matterOwners), dueDate: daysAgo(-ri(1, 25)), priority: pick(['高', '中', '低']), status: pick(['待开始', '进行中', '已完成', '已逾期']) }),
-  );
-  db['timesheets'] = Array.from({ length: 30 }, () =>
-    base({ employeeName: pick(matterOwners), matterName: pick(POOL.caseType) + '一案', workDate: daysAgo(ri(1, 60)), hours: ri(1, 9), description: pick(['庭审', '会见', '文书', '研究', '谈判']), status: pick(['草稿', '已提交', '已审批']) }),
-  );
-  db['schedules'] = Array.from({ length: 16 }, () =>
-    base({ title: pick(['开庭', '客户会议', '内部研讨', '尽调', '证据交换']), matterName: pick(POOL.caseType) + '一案', type: pick(['开庭', '会议', '提醒', ' deadline']), dueDate: daysAgo(-ri(1, 30)), ownerName: pick(matterOwners), remind: bool() }),
-  );
-
-  // 文书
-  db['document'] = Array.from({ length: 38 }, () =>
+  ),
+  'tasks': () => Array.from({ length: 26 }, () =>
+    base({ title: pick(['起草答辩状', '证据整理', '客户访谈', '庭审准备', '法律检索', '合同审阅', '阅卷', '调解方案']), matterName: pick(POOL.caseType) + '一案', assignee: pick(matterOwners()), dueDate: daysAgo(-ri(1, 25)), priority: pick(['高', '中', '低']), status: pick(['待开始', '进行中', '已完成', '已逾期']) }),
+  ),
+  'timesheets': () => Array.from({ length: 30 }, () =>
+    base({ employeeName: pick(matterOwners()), matterName: pick(POOL.caseType) + '一案', workDate: daysAgo(ri(1, 60)), hours: ri(1, 9), description: pick(['庭审', '会见', '文书', '研究', '谈判']), status: pick(['草稿', '已提交', '已审批']) }),
+  ),
+  'schedules': () => Array.from({ length: 16 }, () =>
+    base({ title: pick(['开庭', '客户会议', '内部研讨', '尽调', '证据交换']), matterName: pick(POOL.caseType) + '一案', type: pick(['开庭', '会议', '提醒', ' deadline']), dueDate: daysAgo(-ri(1, 30)), ownerName: pick(matterOwners()), remind: bool() }),
+  ),
+  'document': () => Array.from({ length: 38 }, () =>
     base({ docNo: 'WD' + String(ri(10000, 99999)), docName: pick(POOL.docType) + '（' + companyName() + '）', docType: pick(POOL.docType), matterName: pick(POOL.caseType) + '一案', ownerName: fullName(), size: ri(10, 5000) + 'KB', status: pick(POOL.docStatus) }),
-  );
-  db['document/template'] = Array.from({ length: 12 }, () =>
+  ),
+  'document/template': () => Array.from({ length: 12 }, () =>
     base({ templateName: pick(POOL.docType) + '模板', category: pick(['民事诉讼', '刑事诉讼', '商事', '非诉']), version: 'v' + ri(1, 5) + '.' + ri(0, 9), ownerName: fullName(), status: pick(['启用', '停用']) }),
-  );
-  db['document/seal'] = Array.from({ length: 16 }, () =>
+  ),
+  'document/seal': () => Array.from({ length: 16 }, () =>
     base({ sealName: pick(['公章', '合同专用章', '财务专用章', '发票专用章', '法人章']), applyReason: pick(['合同用印', '函件用印', '证明文件']), applicant: fullName(), applyDate: daysAgo(ri(1, 60)), status: pick(['待审批', '已用印', '已驳回']) }),
-  );
-
-  // 档案
-  db['archive'] = Array.from({ length: 24 }, () => {
+  ),
+  'archive': () => Array.from({ length: 24 }, () => {
     const ct = pick(POOL.caseType);
     return base({
       archiveNo: 'DA' + String(ri(10000, 99999)),
@@ -580,41 +582,39 @@ function buildSeed() {
       pageCount: ri(20, 360),
       status: pick(['在库', '借阅中', '已销毁', '已移交']),
     });
-  });
-  db['archive/access'] = Array.from({ length: 12 }, () =>
+  }),
+  'archive/access': () => Array.from({ length: 12 }, () =>
     base({ archiveNo: 'DA' + String(ri(10000, 99999)), applicant: fullName(), reason: pick(['阅卷', '复印', '移交']), applyDate: daysAgo(ri(1, 40)), approveStatus: pick(['待审批', '已批准', '已驳回']) }),
-  );
-
-  // 财务
-  db['finance/contract'] = Array.from({ length: 30 }, () =>
+  ),
+  'finance/contract': () => Array.from({ length: 30 }, () =>
     base({ contractNo: 'HT' + String(ri(100000, 999999)), contractName: pick(POOL.caseType) + '委托代理合同', clientName: companyName(), matterName: pick(POOL.caseType) + '一案', amount: ri(5, 500) * 10000, signDate: daysAgo(ri(10, 400)), status: pick(POOL.financeStatus), ownerName: fullName() }),
-  );
-  db['finance/invoice'] = Array.from({ length: 24 }, () =>
+  ),
+  'finance/invoice': () => Array.from({ length: 24 }, () =>
     base({ invoiceNo: 'INV' + String(ri(100000, 999999)), contractNo: 'HT' + String(ri(100000, 999999)), clientName: companyName(), amount: ri(1, 200) * 10000, taxRate: pick(['1%', '3%', '6%', '9%']), issueDate: daysAgo(ri(1, 200)), type: pick(['增值税专用发票', '增值税普通发票']), status: pick(['已开具', '已作废', '已红冲']) }),
-  );
-  db['finance/fee'] = Array.from({ length: 20 }, () =>
+  ),
+  'finance/fee': () => Array.from({ length: 20 }, () =>
     base({ feeNo: 'FY' + String(ri(100000, 999999)), clientName: companyName(), matterName: pick(POOL.caseType) + '一案', feeType: pick(['律师费', '诉讼费', '保全费', '鉴定费', '差旅费']), amount: ri(1, 100) * 10000, payable: ri(1, 100) * 10000, paid: ri(0, 80) * 10000, status: pick(POOL.financeStatus), dueDate: daysAgo(-ri(1, 60)) }),
-  );
-  db['finance/commission'] = Array.from({ length: 18 }, () =>
+  ),
+  'finance/commission': () => Array.from({ length: 18 }, () =>
     base({ commissionNo: 'TC' + String(ri(100000, 999999)), lawyerName: fullName(), matterName: pick(POOL.caseType) + '一案', amount: ri(1, 80) * 10000, rate: pick(['15%', '20%', '25%', '30%']), status: pick(['待结算', '已审批', '已发放', '已驳回']), settleDate: daysAgo(ri(1, 120)) }),
-  );
-  db['finance/expense'] = Array.from({ length: 22 }, () =>
+  ),
+  'finance/expense': () => Array.from({ length: 22 }, () =>
     base({ expenseNo: 'BX' + String(ri(100000, 999999)), applicantName: fullName(), category: pick(POOL.expenseCategory), amount: ri(1, 20) * 1000, status: pick(['待审批', '已通过', '已驳回', '已支付']), applyDate: daysAgo(ri(1, 90)), remark: pick(['出差报销', '客户招待', '办公采购']) }),
-  );
-  db['finance/payment'] = Array.from({ length: 16 }, () =>
+  ),
+  'finance/payment': () => Array.from({ length: 16 }, () =>
     base({ paymentNo: 'SK' + String(ri(100000, 999999)), clientName: companyName(), contractNo: 'HT' + String(ri(100000, 999999)), amount: ri(1, 200) * 10000, payMethod: pick(['银行转账', '支票', '汇票']), payDate: daysAgo(ri(1, 150)), status: pick(['已收款', '部分收款', '待确认']) }),
-  );
-
-  // 系统
-  const sysUsers = Object.values(DEMO_USERS).map((u) =>
-    base({ id: u.userId, username: u.username, realName: u.realName, deptName: u.deptName, roleNames: u.roleNames.join(','), email: u.email, phone: u.phone, status: 'ENABLED' }),
-  );
-  db['system/user'] = sysUsers.concat(
-    Array.from({ length: 20 }, () =>
-      base({ username: 'user' + ri(100, 999), realName: fullName(), deptName: pick(POOL.dept), roleNames: pick(POOL.position), email: 'u' + ri(100, 999) + '@lawfirm.demo', phone: '1' + String(ri(3000000000, 5999999999)), status: pick(['ENABLED', 'DISABLED']) }),
-    ),
-  );
-  db['system/role'] = [
+  ),
+  'system/user': () => {
+    const sysUsers = Object.values(DEMO_USERS).map((u) =>
+      base({ id: u.userId, username: u.username, realName: u.realName, deptName: u.deptName, roleNames: u.roleNames.join(','), email: u.email, phone: u.phone, status: 'ENABLED' }),
+    );
+    return sysUsers.concat(
+      Array.from({ length: 20 }, () =>
+        base({ username: 'user' + ri(100, 999), realName: fullName(), deptName: pick(POOL.dept), roleNames: pick(POOL.position), email: 'u' + ri(100, 999) + '@lawfirm.demo', phone: '1' + String(ri(3000000000, 5999999999)), status: pick(['ENABLED', 'DISABLED']) }),
+      ),
+    );
+  },
+  'system/role': () => [
     { id: 1, roleName: '超级管理员', roleCode: 'admin', description: '系统最高权限', status: 'ENABLED' },
     { id: 2, roleName: '主任', roleCode: 'director', description: '律所主任', status: 'ENABLED' },
     { id: 3, roleName: '主办律师', roleCode: 'lawyer', description: '办案律师', status: 'ENABLED' },
@@ -622,44 +622,42 @@ function buildSeed() {
     { id: 5, roleName: '财务', roleCode: 'finance', description: '财务管理', status: 'ENABLED' },
     { id: 6, roleName: '行政', roleCode: 'staff', description: '行政管理', status: 'ENABLED' },
     { id: 7, roleName: '实习律师', roleCode: 'trainee', description: '实习人员', status: 'ENABLED' },
-  ];
-  db['system/department'] = POOL.dept.map((d, i) => ({ id: i + 1, deptName: d, parentName: i === 0 ? '无' : '管委会', leader: fullName(), memberCount: ri(3, 20), status: 'ENABLED' }));
-  db['system/dict'] = Array.from({ length: 16 }, (_, i) => ({ id: i + 1, dictName: pick(['案件类型', '文书类型', '费用类型', '城市', '行业', '性别', '学历', '民族']), dictCode: 'DICT_' + (i + 1), status: 'ENABLED' }));
-  db['system/announcement'] = Array.from({ length: 12 }, () =>
+  ],
+  'system/department': () => POOL.dept.map((d, i) => ({ id: i + 1, deptName: d, parentName: i === 0 ? '无' : '管委会', leader: fullName(), memberCount: ri(3, 20), status: 'ENABLED' })),
+  'system/dict': () => Array.from({ length: 16 }, (_, i) => ({ id: i + 1, dictName: pick(['案件类型', '文书类型', '费用类型', '城市', '行业', '性别', '学历', '民族']), dictCode: 'DICT_' + (i + 1), status: 'ENABLED' })),
+  'system/announcement': () => Array.from({ length: 12 }, () =>
     base({ title: pick(['关于', '通知', '提醒']) + pick(['元旦放假', '年度考核', '系统升级', '培训安排', '费用报销制度']), content: '这是一条演示公告内容，用于展示公告管理模块。', publisher: fullName(), publishTime: dateTimeAgo(ri(1, 60)), level: pick(POOL.announcementLevel) }),
-  );
-  db['system/log'] = Array.from({ length: 30 }, () =>
+  ),
+  'system/log': () => Array.from({ length: 30 }, () =>
     ({ id: nextId(), module: pick(['用户', '角色', '案件', '客户', '财务', '系统']), action: pick(['新增', '修改', '删除', '查询', '导出', '登录']), operator: fullName(), ip: '192.168.' + ri(1, 255) + '.' + ri(1, 255), operateTime: dateTimeAgo(ri(0, 60)), result: pick(['成功', '成功', '成功', '失败']) }),
-  );
-  db['system/config'] = [
+  ),
+  'system/config': () => [
     { id: 1, configKey: 'sys.title', configName: '系统标题', configValue: '智慧律所管理系统', group: '基础' },
     { id: 2, configKey: 'sys.logo', configName: '系统 Logo', configValue: '/logo.png', group: '基础' },
     { id: 3, configKey: 'sys.copyright', configName: '版权信息', configValue: '© 2026 演示版', group: '基础' },
     { id: 4, configKey: 'sys.theme', configName: '默认主题', configValue: 'dark', group: '外观' },
-  ];
-  db['system/backup'] = Array.from({ length: 8 }, () =>
+  ],
+  'system/backup': () => Array.from({ length: 8 }, () =>
     ({ id: nextId(), backupNo: 'BK' + String(ri(100000, 999999)), type: pick(['全量', '增量']), size: ri(100, 9000) + 'MB', startTime: dateTimeAgo(ri(1, 60)), status: pick(['成功', '进行中', '失败']), operator: fullName() }),
-  );
-  db['system/integration'] = [
+  ),
+  'system/integration': () => [
     { id: 1, name: '企业微信', type: 'wecom', status: 'ENABLED', config: '{}' },
     { id: 2, name: 'MinIO 对象存储', type: 'minio', status: 'ENABLED', config: '{}' },
     { id: 3, name: 'OnlyOffice', type: 'office', status: 'DISABLED', config: '{}' },
-  ];
-
-  // 人事
-  db['hr/employee'] = Array.from({ length: 30 }, () =>
+  ],
+  'hr/employee': () => Array.from({ length: 30 }, () =>
     base({ employeeNo: 'EMP' + String(ri(1000, 9999)), realName: fullName(), deptName: pick(POOL.dept), position: pick(POOL.position), hireDate: daysAgo(ri(100, 2000)), status: pick(['在职', '试用', '离职']) }),
-  );
-  db['hr/contract'] = Array.from({ length: 24 }, () =>
+  ),
+  'hr/contract': () => Array.from({ length: 24 }, () =>
     base({ employeeName: fullName(), contractType: pick(['固定期限', '无固定期限', '实习协议']), startDate: daysAgo(ri(100, 1500)), endDate: daysAgo(-ri(100, 1000)), status: pick(['生效中', '已到期', '已解除']) }),
-  );
-  db['hr/attendance'] = Array.from({ length: 28 }, () =>
+  ),
+  'hr/attendance': () => Array.from({ length: 28 }, () =>
     ({ id: nextId(), employeeName: fullName(), date: daysAgo(ri(1, 60)), checkIn: '0' + ri(7, 9) + ':' + String(ri(0, 59)).padStart(2, '0'), checkOut: '1' + ri(7, 9) + ':' + String(ri(0, 59)).padStart(2, '0'), status: pick(['正常', '迟到', '早退', '缺勤']) }),
-  );
-  db['hr/leave'] = Array.from({ length: 18 }, () =>
+  ),
+  'hr/leave': () => Array.from({ length: 18 }, () =>
     base({ employeeName: fullName(), leaveType: pick(POOL.leaveType), startDate: daysAgo(ri(1, 60)), endDate: daysAgo(ri(1, 55)), days: ri(1, 15), status: pick(['待审批', '已批准', '已驳回']) }),
-  );
-  db['hr/payroll'] = Array.from({ length: 28 }, () => {
+  ),
+  'hr/payroll': () => Array.from({ length: 28 }, () => {
     const d = new Date();
     d.setMonth(d.getMonth() - ri(0, 3));
     const period = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -684,161 +682,311 @@ function buildSeed() {
       confirmStatus: pick(['已确认', '待确认']),
       status: pick(['待发放', '已发放', '已确认']),
     });
-  });
-  db['hr/performance'] = Array.from({ length: 14 }, () =>
+  }),
+  'hr/performance': () => Array.from({ length: 14 }, () =>
     base({ employeeName: fullName(), period: ri(2024, 2026) + 'Q' + ri(1, 4), score: ri(60, 100), grade: pick(['S', 'A', 'B', 'C']), status: pick(['进行中', '已完成']) }),
-  );
-
-  // 行政
-  db['admin/asset'] = Array.from({ length: 26 }, () =>
+  ),
+  'admin/asset': () => Array.from({ length: 26 }, () =>
     base({ assetNo: 'ZC' + String(ri(10000, 99999)), assetName: pick(['笔记本电脑', '台式机', '打印机', '投影仪', '办公桌椅', '车辆', '服务器']), category: pick(POOL.assetCategory), ownerName: fullName(), location: pick(POOL.city) + '办公室' + ri(1, 9), value: ri(1, 50) * 1000, purchaseDate: daysAgo(ri(100, 1500)), status: pick(['在用', '闲置', '维修中', '已报废']) }),
-  );
-  db['admin/meeting-room'] = Array.from({ length: 8 }, () =>
+  ),
+  'admin/meeting-room': () => Array.from({ length: 8 }, () =>
     ({ id: nextId(), roomName: pick(POOL.city) + '会议室' + ri(1, 9), location: ri(1, 9) + '楼', capacity: ri(4, 30), facility: pick(['投影', '视频会议', '白板', '音响']), status: pick(['可用', '占用', '维护中']) }),
-  );
-  db['admin/letter'] = Array.from({ length: 12 }, () =>
+  ),
+  'admin/letter': () => Array.from({ length: 12 }, () =>
     base({ title: pick(['介绍信', '公函', '调查函']), applicant: fullName(), purpose: pick(['立案', '调查取证', '查询档案']), applyDate: daysAgo(ri(1, 50)), status: pick(['待审批', '已开具', '已作废']) }),
-  );
-  db['admin/purchase'] = Array.from({ length: 14 }, () =>
+  ),
+  'admin/purchase': () => Array.from({ length: 14 }, () =>
     base({ purchaseNo: 'CG' + String(ri(100000, 999999)), itemName: pick(['办公用品', '软件授权', '设备', '耗材']), supplier: companyName(), amount: ri(1, 50) * 1000, applyDate: daysAgo(ri(1, 80)), status: pick(['待审批', '已采购', '已驳回']) }),
-  );
-  db['admin/supplier'] = Array.from({ length: 10 }, () =>
+  ),
+  'admin/supplier': () => Array.from({ length: 10 }, () =>
     ({ id: nextId(), supplierName: companyName(), category: pick(['办公用品', 'IT服务', '印刷', '餐饮']), contactName: fullName(), contactPhone: '1' + String(ri(3000000000, 5999999999)), status: pick(['合作中', '待评估', '已终止']) }),
-  );
-
-  // 知识库
-  db['knowledge/article'] = Array.from({ length: 20 }, () => {
+  ),
+  'knowledge/article': () => Array.from({ length: 20 }, () => {
     const cat = pick(POOL.knowledgeCategory);
     const author = fullName();
     const status = pick(['草稿', '已发布', '已下线']);
     return base({ title: cat + '：' + pick(POOL.caseType) + '实务要点', author, authorName: author, category: cat, categoryName: cat, tags: pick(POOL.knowledgeCategory), views: ri(10, 2000), likes: ri(0, 300), publishTime: daysAgo(ri(1, 300)), status, statusName: status });
-  });
-  db['knowledge/law'] = Array.from({ length: 18 }, () => {
+  }),
+  'knowledge/law': () => Array.from({ length: 18 }, () => {
     const title = pick(['民法典', '民事诉讼法', '公司法', '刑法', '行政处罚法']) + '相关条款解读';
     const cat = pick(['法律', '司法解释', '行政法规']);
     const issuer = pick(['全国人大', '最高法院', '司法部']);
     const status = pick(['生效', '征求意见稿']);
     return base({ title, name: title, category: cat, categoryName: cat, lawTypeName: cat, source: issuer, issuer, issueDate: daysAgo(ri(100, 2000)), effectiveDate: daysAgo(ri(100, 2000)), status, statusName: status });
-  });
-  db['knowledge/case'] = Array.from({ length: 16 }, () =>
+  }),
+  'knowledge/case': () => Array.from({ length: 16 }, () =>
     base({ title: pick(POOL.caseType) + '典型案例评析', caseNo: '(' + ri(2020, 2025) + ')最高法民再' + ri(1, 999) + '号', courtName: pick(POOL.court), tags: pick(POOL.caseType), status: pick(['已发布', '草稿']) }),
-  );
-
-  // 工作流
-  db['workbench/approval'] = Array.from({ length: 22 }, () =>
+  ),
+  'workbench/approval': () => Array.from({ length: 22 }, () =>
     base({ title: pick(['用印申请', '报销申请', '请假申请', '采购申请', '结案申请']), type: pick(['用印', '报销', '请假', '采购', '结案']), applicant: fullName(), amount: ri(1, 50) * 1000, status: pick(['待审批', '已通过', '已驳回', '已撤销']), applyTime: dateTimeAgo(ri(0, 40)), currentNode: pick(['部门负责人', '财务', '主任', '已完成']) }),
-  );
-  db['workbench/report'] = Array.from({ length: 14 }, () =>
+  ),
+  'workbench/report': () => Array.from({ length: 14 }, () =>
     base({ title: pick(POOL.caseType) + '阶段报告', matterName: pick(POOL.caseType) + '一案', author: fullName(), period: ri(2024, 2026) + '-' + String(ri(1, 12)).padStart(2, '0'), status: pick(['草稿', '已提交', '已审批']) }),
-  );
-  db['workbench/report-template'] = Array.from({ length: 8 }, () =>
+  ),
+  'workbench/report-template': () => Array.from({ length: 8 }, () =>
     ({ id: nextId(), templateName: pick(POOL.caseType) + '报告模板', category: pick(['诉讼', '非诉', '顾问']), status: pick(['启用', '停用']) }),
-  );
-  db['workbench/scheduled-report'] = Array.from({ length: 6 }, () =>
+  ),
+  'workbench/scheduled-report': () => Array.from({ length: 6 }, () =>
     ({ id: nextId(), name: pick(['周报', '月报', '季报']) + '自动推送', cron: '0 9 * * 1', receivers: fullName(), status: pick(['启用', '停用']) }),
-  );
-
-  // 证据
-  db['evidence'] = Array.from({ length: 20 }, () =>
+  ),
+  'evidence': () => Array.from({ length: 20 }, () =>
     base({ evidenceNo: 'EVD' + String(ri(10000, 99999)), matterName: pick(POOL.caseType) + '一案', name: pick(['合同原件', '转账记录', '聊天记录', '鉴定意见', '现场勘验']), type: pick(['书证', '物证', '电子证据', '鉴定意见']), status: pick(['已采集', '待整理', '已归档']), collectDate: daysAgo(ri(1, 200)), holder: fullName() }),
-  );
-
-  // AI
-  db['ai/pricing'] = Array.from({ length: 8 }, () =>
+  ),
+  'ai/pricing': () => Array.from({ length: 8 }, () =>
     ({ id: nextId(), modelName: pick(['GPT-4o', 'Claude', '通义千问', '文心一言', '智谱GLM']), unit: pick(['千tokens', '次']), price: (ri(1, 100) / 10).toFixed(2), status: pick(['启用', '停用']), effectiveDate: daysAgo(ri(1, 200)) }),
-  );
-  db['ai/usage'] = Array.from({ length: 24 }, () =>
+  ),
+  'ai/usage': () => Array.from({ length: 24 }, () =>
     ({ id: nextId(), userName: fullName(), model: pick(['GPT-4o', 'Claude', '通义千问']), tokens: ri(1000, 500000), cost: (ri(1, 500) / 10).toFixed(2), date: daysAgo(ri(1, 60)) }),
-  );
+  ),
+  'admin/meeting-record': () => {
+    const rooms = getCol('admin/meeting-room');
+    return Array.from({ length: 12 }, () =>
+      base({
+        recordNo: 'HY' + String(ri(10000, 99999)),
+        roomId: pick(rooms).id,
+        roomName: pick(rooms).roomName,
+        title: pick(['周例会', '客户洽谈', '案件研讨', '尽职调查', '内部培训']),
+        meetingDate: daysAgo(ri(1, 60)),
+        startTime: String(ri(9, 17)).padStart(2, '0') + ':00',
+        endTime: String(ri(18, 21)).padStart(2, '0') + ':00',
+        organizerName: fullName(),
+        status: pick(['已完成', '进行中', '已取消']),
+      }),
+    );
+  },
+};
 
-  // 复数端点别名：部分前端接口使用复数路径（/admin/assets、/admin/suppliers、
-  // /admin/purchases、/admin/meeting-records），与种子集合的单数键对齐。
-  db['admin/assets'] = db['admin/asset'];
-  db['admin/suppliers'] = db['admin/supplier'];
-  db['admin/purchases'] = db['admin/purchase'];
-  db['admin/meeting-records'] = db['admin/meeting-record'];
+/* ---------------------------------------------------------------------------
+ * 集合别名：部分前端接口走复数路径（/admin/assets、/admin/suppliers、
+ * /admin/purchases、/admin/meeting-records），与种子集合的单数键共用同一份数据。
+ * ------------------------------------------------------------------------- */
+const ALIASES = {
+  'admin/assets': 'admin/asset',
+  'admin/suppliers': 'admin/supplier',
+  'admin/purchases': 'admin/purchase',
+  'admin/meeting-records': 'admin/meeting-record',
+};
 
-  return enrich(db);
+/* ---------------------------------------------------------------------------
+ * 懒加载集合访问层
+ *
+ * dbProxy 对上游代码保持"普通对象"的读写语义（db[key] / db[key] = v /
+ * Object.keys(db)），但每个集合只在第一次被读取时才调用 SEED_BUILDERS 生成，
+ * 未访问的集合完全不消耗时间——打开一个页面只付该页面的钱。
+ *
+ * 注意 getOwnPropertyDescriptor 刻意不返回值：Object.keys(db) 只用于取键名
+ * 做路由前缀匹配，若在描述符里取值会把全部集合都构建出来，懒加载就失效了。
+ * ------------------------------------------------------------------------- */
+const _col = new Map(); // key -> array，已构建（或已从 IDB hydrate）的集合
+let _keyOrder = null;   // 路由用的键名排序缓存（最长前缀优先）
+
+function canonicalKey(key) {
+  return Object.prototype.hasOwnProperty.call(ALIASES, key) ? ALIASES[key] : key;
 }
+
+/** 是否有对应 builder（用 hasOwnProperty，避免命中 constructor 等原型键） */
+function hasBuilder(key) {
+  return Object.prototype.hasOwnProperty.call(SEED_BUILDERS, key);
+}
+
+/** 取得集合；没有对应 builder 时返回 undefined（由调用方决定是否建空集合） */
+function getCol(key) {
+  const k = canonicalKey(key);
+  if (_col.has(k)) return _col.get(k);
+  if (!hasBuilder(k)) return undefined;
+  const arr = enrichCollection(k, SEED_BUILDERS[k]());
+  _col.set(k, arr);
+  return arr;
+}
+
+/** 写入集合；别名写入会落到规范键，保证 /admin/assets 与 /admin/asset 同源 */
+function setCol(key, value) {
+  _col.set(canonicalKey(key), value);
+  _keyOrder = null;
+}
+
+function allCollectionKeys() {
+  return [...new Set([...Object.keys(SEED_BUILDERS), ...Object.keys(ALIASES), ..._col.keys()])];
+}
+
+function knownKeys() {
+  if (!_keyOrder) _keyOrder = allCollectionKeys().sort((a, b) => b.length - a.length);
+  return _keyOrder;
+}
+
+const dbProxy = new Proxy(
+  {},
+  {
+    get(_t, key) {
+      if (typeof key !== 'string') return undefined;
+      return getCol(key);
+    },
+    set(_t, key, value) {
+      if (typeof key === 'string') setCol(key, value);
+      return true;
+    },
+    has(_t, key) {
+      if (typeof key !== 'string') return false;
+      return hasBuilder(key) || Object.prototype.hasOwnProperty.call(ALIASES, key) || _col.has(canonicalKey(key));
+    },
+    ownKeys() {
+      return allCollectionKeys();
+    },
+    getOwnPropertyDescriptor(_t, key) {
+      if (typeof key !== 'string') return undefined;
+      if (!(hasBuilder(key) || Object.prototype.hasOwnProperty.call(ALIASES, key) || _col.has(canonicalKey(key)))) return undefined;
+      return { value: undefined, enumerable: true, configurable: true, writable: true };
+    },
+    deleteProperty(_t, key) {
+      if (typeof key === 'string') {
+        _col.delete(canonicalKey(key));
+        _keyOrder = null;
+      }
+      return true;
+    },
+  },
+);
 
 /* ---------------------------------------------------------------------------
  * IndexedDB 持久化（让演示数据的增删改在刷新后保留，并支持一键重置）
+ *
+ * v2 起按集合分键存储：每个集合一条 `col:<name>` 记录，只写入"本次会话真正
+ * 构建过"的集合。这样首次访问只 hydrate 少量集合，不会把整库读进内存；
+ * v1 的单 blob `db` 键在 upgrade 时删除（旧格式一次写全量，且种子结构已调整）。
  * ------------------------------------------------------------------------- */
 const IDB_NAME = 'lawfirm-demo';
+const IDB_VERSION = 2;
 const IDB_STORE = 'kv';
-const IDB_KEY = 'db';
+const IDB_PREFIX = 'col:';
 let _dbPromise = null;
 function openIDB() {
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = () => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (ev) => {
       const db = req.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      // 迁移 v1：丢弃旧的单 blob 全量数据，改为按集合懒载入
+      if (ev.oldVersion < 2) {
+        try {
+          db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).delete('db');
+        } catch {
+          /* 忽略：最坏情况是多留一条无人读取的旧键 */
+        }
+      }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      _dbPromise = null; // 失败不缓存，允许后续请求重试
+      reject(req.error);
+    };
+    req.onblocked = () => {
+      _dbPromise = null;
+      reject(new Error('indexedDB blocked'));
+    };
   });
   return _dbPromise;
 }
-async function idbGet(key) {
+
+/** 读出所有已持久化的集合，返回 Map<key, array> */
+async function idbReadCollections() {
   const db = await openIDB();
   return new Promise((resolve, reject) => {
+    const out = new Map();
     const tx = db.transaction(IDB_STORE, 'readonly');
-    const req = tx.objectStore(IDB_STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
+    const req = tx.objectStore(IDB_STORE).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return;
+      if (typeof cur.key === 'string' && cur.key.startsWith(IDB_PREFIX)) {
+        out.set(cur.key.slice(IDB_PREFIX.length), cur.value);
+      }
+      cur.continue();
+    };
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
     req.onerror = () => reject(req.error);
   });
 }
-async function idbSet(key, value) {
+
+/** 批量写入集合（key -> array） */
+async function idbWriteCollections(map) {
+  if (!map.size) return;
   const db = await openIDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function idbDelete(key) {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(key);
+    const store = tx.objectStore(IDB_STORE);
+    for (const [k, v] of map) store.put(v, IDB_PREFIX + k);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-let _cache = null; // 内存缓存，避免每次请求都读 IDB
+/** 清空所有已持久化的集合 */
+async function idbClearCollections() {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const req = tx.objectStore(IDB_STORE).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return;
+      if (typeof cur.key === 'string' && cur.key.startsWith(IDB_PREFIX)) cur.delete();
+      cur.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+let _hydrated = false;
+/**
+ * 返回懒加载数据库代理。首次调用时把 IDB 里已持久化的集合 hydrate 进内存，
+ * 其余集合保持"未构建"，等被访问时再生成。IDB 不可用（隐私模式等）时降级为
+ * 纯内存模式：增删改仍然生效，只是刷新后回到种子数据。
+ */
 async function getDB() {
-  if (_cache) return _cache;
-  const stored = await idbGet(IDB_KEY);
-  if (stored && stored.version === SW_VERSION) {
-    _cache = stored.data;
-  } else {
-    _cache = buildSeed();
-    await idbSet(IDB_KEY, { version: SW_VERSION, data: _cache });
+  if (_hydrated) return dbProxy;
+  try {
+    const stored = await idbReadCollections();
+    for (const [k, v] of stored) if (Array.isArray(v)) _col.set(k, v);
+  } catch {
+    /* IDB 不可用：纯内存降级 */
   }
-  return _cache;
+  _hydrated = true;
+  return dbProxy;
 }
+
+/** 把本次会话构建过的集合写回 IDB（未访问过的集合不产生任何 IO） */
 async function saveDB() {
-  if (_cache) await idbSet(IDB_KEY, { version: SW_VERSION, data: _cache });
+  if (!_col.size) return;
+  try {
+    await idbWriteCollections(_col);
+  } catch {
+    /* 写入失败不影响内存中的数据，页面继续可用 */
+  }
 }
+
+/** 一键重置：丢弃内存与 IDB 中的全部集合，下次访问按种子重新生成 */
 async function resetDB() {
-  _cache = buildSeed();
-  await idbSet(IDB_KEY, { version: SW_VERSION, data: _cache });
-  return _cache;
+  _col.clear();
+  _keyOrder = null;
+  _hydrated = true;
+  try {
+    await idbClearCollections();
+  } catch {
+    /* 忽略 */
+  }
+  return dbProxy;
 }
 
 /* ---------------------------------------------------------------------------
  * 通用集合路由解析
  * 支持：/x/list、/x、/x/:id、/x/:id/action、/x/sub、/x/sub/list、/x/batch
  * ------------------------------------------------------------------------- */
-function knownKeys(db) {
-  return Object.keys(db).sort((a, b) => b.length - a.length);
-}
-function findCollection(db, pathSegs) {
-  const keys = knownKeys(db);
+function findCollection(pathSegs) {
+  const keys = knownKeys();
   // 从最长前缀匹配
   for (const key of keys) {
     const ksegs = key.split('/');
@@ -856,9 +1004,9 @@ function findCollection(db, pathSegs) {
   return null;
 }
 const LIST_SUFFIX = ['list', 'page', 'listPage', 'query'];
-function resolve(db, path) {
+function resolve(path) {
   const segs = path.split('/').filter(Boolean);
-  const found = findCollection(db, segs);
+  const found = findCollection(segs);
   if (!found) {
     // 未知集合：以"去掉末尾 list 后缀"的路径作为集合名；其余视为集合根
     let coll = segs.join('/');
@@ -867,7 +1015,7 @@ function resolve(db, path) {
       coll = segs.slice(0, -1).join('/');
       rest = ['list'];
     }
-    if (!db[coll]) db[coll] = [];
+    if (!getCol(coll)) setCol(coll, []);
     return { key: coll, rest };
   }
   return { key: found.key, rest: found.rest };
@@ -891,7 +1039,7 @@ function paginate(arr, params) {
 }
 
 async function handleCollection(method, apiPath, params, body, db) {
-  const { key, rest } = resolve(db, apiPath);
+  const { key, rest } = resolve(apiPath);
   if (!db[key]) db[key] = [];
   const coll = db[key];
 
