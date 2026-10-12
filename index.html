@@ -47,11 +47,14 @@
   document.getElementById('dp-toggle').onclick=function(){var p=document.getElementById('demo-panel');p.classList.toggle('collapsed');document.getElementById('dp-caret').textContent=p.classList.contains('collapsed')?'▸':'▾';};
   document.getElementById('dp-gh').onclick=function(){window.open('https://github.com/JunyuZhan/law-firm-demo','_blank');};
   document.getElementById('dp-reset').onclick=function(){
-    if(!navigator.serviceWorker||!navigator.serviceWorker.controller){location.reload();return;}
     fetch('/api/demo/reset',{method:'POST'}).then(function(){location.reload();}).catch(function(){location.reload();});
   };
 
-  /* ===== 应用入口：等 Service Worker（Mock 后端）接管页面后再加载，避免 /api 首屏 404 ===== */
+  /* ===== Mock 后端：页面内拦截 /api/*（不再依赖 Service Worker） =====
+   * 把 sw.js 的逻辑原样在页面内运行（self 指向桩对象），捕获其 fetch 处理器，
+   * 再用 fetch / XMLHttpRequest 拦截器把 /api 请求喂给它。逻辑零改动、行为完全一致。
+   * 同时注销所有已存在的 SW（清理用户浏览器里卡住的老 SW），确保无论如何都能正常工作。
+   * 这样彻底摆脱 SW 注册竞态 / Cloudflare 缓存 / 浏览器兼容 / 无痕差异等问题。 */
   function loadApp(){
     if(window.__appLoaded) return;
     var e=document.getElementById('app-entry');
@@ -63,21 +66,101 @@
     document.head.appendChild(n);
     e.remove();
   }
-  // 版本号须与 sw.js 内 SW_VERSION 保持一致；每次改动 sw.js 请同步此处，
-  // 否则 Cloudflare 的 4h 缓存会一直吐旧 sw.js（表现为 /api 旧报错复现）。
-  var SW_VER = 'demo-v1.0.2';
-  function boot(){
-    if(!('serviceWorker' in navigator)){ loadApp(); return; }
-    // 注册带版本号的 URL：Cloudflare 按 URL 缓存，换版本即 cache MISS，强制拉新 sw.js
-    navigator.serviceWorker.register('/sw.js?__v='+encodeURIComponent(SW_VER),{scope:'/',updateViaCache:'none'}).then(function(reg){
-      // 仅当“本次注册的 SW”已真正接管本页时才立即加载；否则等 clients.claim 触发的
-      // controllerchange 后再加载。避免“旧 SW 仍接管时就提前启动应用”→ /api 仍 404。
-      if(navigator.serviceWorker.controller && reg.active && navigator.serviceWorker.controller === reg.active){ loadApp(); return; }
-      navigator.serviceWorker.addEventListener('controllerchange', loadApp);
-    }).catch(function(e){ console.warn('SW 注册失败',e); loadApp(); });
+
+  // 1) 清理可能卡住的旧 Service Worker（避免老 SW 继续接管 /api 造成 404）
+  if('serviceWorker' in navigator){
+    try{ navigator.serviceWorker.getRegistrations().then(function(regs){ regs.forEach(function(r){ try{ r.unregister(); }catch(_){} }); }).catch(function(){}); }catch(_){}
   }
-  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); }
-  else { boot(); }
+
+  // 2) 桩 self：让 sw.js 在页面内运行
+  var swSelf = {
+    location: { origin: location.origin },
+    registration: { scope: '/' },
+    _h: {},
+    addEventListener: function(t, fn){ this._h[t] = fn; },
+    skipWaiting: function(){ return Promise.resolve(); },
+    clients: { claim: function(){ return Promise.resolve(); }, matchAll: function(){ return Promise.resolve([]); } },
+    caches: (typeof caches !== 'undefined') ? caches : { open: function(){ return Promise.resolve({ addAll:function(){}, put:function(){}, match:function(){} }); }, keys:function(){return Promise.resolve([]);}, delete:function(){} }
+  };
+
+  function bootMock(){
+    fetch('/sw.js').then(function(r){ return r.text(); }).then(function(code){
+      try { (new Function('self', code))(swSelf); } catch(e){ console.warn('Mock 初始化失败', e); loadApp(); return; }
+      var fetchHandler = swSelf._h['fetch'];
+      if(!fetchHandler){ console.warn('Mock 未捕获到 fetch 处理器'); loadApp(); return; }
+
+      function mockFetch(url, opts){
+        opts = opts || {};
+        var req = new Request(url, { method: (opts.method||'GET'), headers: opts.headers, body: opts.body });
+        var event = { request: req, respondWith: function(p){ event._p = p; } };
+        fetchHandler(event);
+        return event._p;
+      }
+
+      // 3) 重写 window.fetch
+      var _origFetch = window.fetch ? window.fetch.bind(window) : null;
+      window.fetch = function(input, init){
+        var u = (typeof input === 'string') ? input : (input && input.url) || '';
+        var abs = new URL(u, location.href).href;
+        if (new URL(abs).pathname.startsWith('/api')) { return mockFetch(abs, init); }
+        return _origFetch ? _origFetch(input, init) : fetch(input, init);
+      };
+
+      // 4) 重写 XMLHttpRequest（vben 的 axios 走 XHR）
+      var _NativeXHR = window.XMLHttpRequest;
+      function MockXHR(){
+        this._headers = {}; this._method='GET'; this._url=''; this._async=true; this.withCredentials=false;
+        this.readyState=0; this.status=0; this.statusText=''; this.responseText=''; this.response=null;
+        this.onreadystatechange=null; this.onload=null; this.onerror=null; this.onloadend=null;
+      }
+      MockXHR.prototype.open = function(m,u,a){ this._method=m; this._url=u; this._async=(a!==false); };
+      MockXHR.prototype.setRequestHeader = function(k,v){ this._headers[k]=v; };
+      MockXHR.prototype.getAllResponseHeaders = function(){ return this._respHeaders||''; };
+      MockXHR.prototype.getResponseHeader = function(k){ return (this._respHeaderMap && this._respHeaderMap[k.toLowerCase()])||null; };
+      MockXHR.prototype.abort = function(){};
+      MockXHR.prototype.send = function(body){
+        var selfX = this;
+        var abs, path;
+        try { abs = new URL(this._url, location.href).href; path = new URL(abs).pathname; } catch(e){ abs=this._url; path=''; }
+        if (path.startsWith('/api')) {
+          var hdrs = new Headers();
+          for (var k in this._headers) hdrs.set(k, this._headers[k]);
+          if (body && !hdrs.has('content-type')) hdrs.set('content-type','application/json');
+          mockFetch(abs, { method: this._method, headers: hdrs, body: body }).then(async function(resp){
+            selfX.status = resp.status; selfX.statusText = resp.statusText;
+            selfX.responseText = await resp.text(); selfX.response = selfX.responseText;
+            var h=''; var m={}; resp.headers.forEach(function(v,k){ h+=k+': '+v+'\r\n'; m[k.toLowerCase()]=v; });
+            selfX._respHeaders=h; selfX._respHeaderMap=m;
+            selfX.readyState=4;
+            if(selfX.onreadystatechange) selfX.onreadystatechange();
+            if(selfX.onload) selfX.onload();
+            if(selfX.onloadend) selfX.onloadend();
+          }).catch(function(e){
+            selfX.status=500; selfX.statusText=String(e); selfX.readyState=4;
+            if(selfX.onerror) selfX.onerror(e); if(selfX.onloadend) selfX.onloadend();
+          });
+        } else {
+          var xhr = new _NativeXHR();
+          xhr.open(selfX._method, selfX._url, selfX._async);
+          for (var k2 in selfX._headers) xhr.setRequestHeader(k2, selfX._headers[k2]);
+          xhr.withCredentials = selfX.withCredentials;
+          xhr.onreadystatechange = function(){ selfX.readyState=xhr.readyState; selfX.status=xhr.status; selfX.statusText=xhr.statusText; selfX.responseText=xhr.responseText; selfX.response=xhr.response; if(selfX.onreadystatechange) selfX.onreadystatechange(); };
+          xhr.onload = function(){ if(selfX.onload) selfX.onload(); };
+          xhr.onerror = function(e){ if(selfX.onerror) selfX.onerror(e); };
+          xhr.onloadend = function(){ if(selfX.onloadend) selfX.onloadend(); };
+          xhr.send(body);
+        }
+      };
+      window.XMLHttpRequest = MockXHR;
+
+      // 5) Mock 就绪，加载应用
+      window.__mockReady = true;
+      loadApp();
+    }).catch(function(e){ console.warn('sw.js 加载失败', e); loadApp(); });
+  }
+
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', bootMock); }
+  else { bootMock(); }
 })();
 </script>
 </body></html>
